@@ -1,0 +1,838 @@
+{
+  "name": "11_-_AI_Learning_Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "48e4edab-e3b1-4b05-8eb4-69437f83525a",
+      "name": "When Called (by Analytics)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2032,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/analytics?select=views,ctr_pct,completion_rate_pct,retention_pct,publish_targets(published_at,platform,content_items(script_json,platform),video_assets(duration_seconds,wardrobe_variant,background_variant))&metric_date=gt.{{ $now.minus({ days: 30 }).toFormat('yyyy-MM-dd') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w11n-fetchdata",
+      "name": "Fetch Combined Analytics Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1808,
+        208
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(function(i) { return i.json; });\n\nfunction avg(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : 0; }\nfunction topGroup(groups) {\n  const entries = Object.entries(groups).map(([k, v]) => ({ key: k, avg_metric: avg(v), n: v.length }));\n  entries.sort((a, b) => b.avg_metric - a.avg_metric);\n  return entries.slice(0, 5);\n}\n\nconst hookGroups = {}, ctaGroups = {}, durationGroups = {}, variantGroups = {}, platformGroups = {}, hourGroups = {};\n\nrows.forEach(r => {\n  const pt = r.publish_targets;\n  if (!pt) return;\n  const ci = pt.content_items;\n  const va = pt.video_assets;\n\n  if (ci && ci.platform === 'instagram_reel' && ci.script_json) {\n    if (ci.script_json.hook) { (hookGroups[ci.script_json.hook] ||= []).push(r.completion_rate_pct || 0); }\n    if (ci.script_json.cta) { (ctaGroups[ci.script_json.cta] ||= []).push(r.ctr_pct || 0); }\n  }\n  if (va && va.duration_seconds != null) {\n    (durationGroups[va.duration_seconds] ||= []).push(r.retention_pct || 0);\n  }\n  if (va && va.wardrobe_variant) {\n    const key = va.wardrobe_variant + ' / ' + (va.background_variant || '');\n    (variantGroups[key] ||= []).push(r.completion_rate_pct || 0);\n  }\n  if (pt.platform) {\n    (platformGroups[pt.platform] ||= []).push(r.views || 0);\n  }\n  if (pt.published_at) {\n    const hour = new Date(pt.published_at).getUTCHours();\n    (hourGroups[hour] ||= []).push(r.views || 0);\n  }\n});\n\nconst dimensions = [\n  { insight_type: 'best_hook', metric_name: 'avg_completion_rate_pct', template_key: 'instagram_reel', data: topGroup(hookGroups) },\n  { insight_type: 'best_cta', metric_name: 'avg_ctr_pct', template_key: 'instagram_reel', data: topGroup(ctaGroups) },\n  { insight_type: 'best_duration', metric_name: 'avg_retention_pct', template_key: 'heygen_video_agent_user', data: topGroup(durationGroups) },\n  { insight_type: 'best_avatar_variant', metric_name: 'avg_completion_rate_pct', template_key: null, data: topGroup(variantGroups) },\n  { insight_type: 'best_platform', metric_name: 'avg_views', template_key: null, data: topGroup(platformGroups) },\n  { insight_type: 'best_posting_hour_utc', metric_name: 'avg_views', template_key: null, data: topGroup(hourGroups) }\n];\n\nreturn dimensions.map(dim => ({ json: dim }));\n"
+      },
+      "id": "w11n-computedims",
+      "name": "Compute 6 Insight Dimensions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1584,
+        208
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "635b0164-9f29-4b7f-8e85-22101cd8987d",
+      "name": "Loop Dimensions",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1360,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const dim = $input.first().json;\nconst prompt = `You are a content strategist analyzing performance data for an Indian career-guidance content channel.\\n\\nDimension: ${dim.insight_type}\\nMetric: ${dim.metric_name}\\nTop groups (best to worst, up to 5): ${JSON.stringify(dim.data)}\\n\\nIf there is not enough data (fewer than 3 groups, or all groups have very few samples), say so honestly with low confidence rather than inventing a pattern.\\n\\nReturn ONLY valid JSON: { \"finding\": \"1-2 sentence plain-English description of the pattern\", \"confidence\": 0.0-1.0, \"recommended_change\": \"specific, actionable change to make, or null if not confident enough to act\" }`;\nreturn [{ json: { ...dim, prompt } }];"
+      },
+      "id": "w11n-buildfindingprompt",
+      "name": "Build Finding Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1136,
+        80
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "You are a data-driven content strategist. Always respond with raw JSON only, never markdown fences, never invented statistics beyond the data given."
+        }
+      },
+      "id": "w11n-aiagentfinding",
+      "name": "AI Agent: Synthesize Finding",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -912,
+        80
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-pro",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "w11n-geminifindingprimary",
+      "name": "Gemini Finding Primary",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -896,
+        304
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BM52vHe9rRcBkQE4",
+          "name": "SUGG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "w11n-geminifindingfallback",
+      "name": "Gemini Finding Fallback",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -768,
+        304
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BM52vHe9rRcBkQE4",
+          "name": "SUGG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const dim = $('Build Finding Prompt').item.json;\nconst resp = $json;\nlet text = (resp.output || '').trim().replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```\\s*$/i, '').trim();\nlet parsed;\ntry { parsed = JSON.parse(text); } catch (e) { parsed = { finding: 'Could not parse model output', confidence: 0, recommended_change: null }; }\n\nreturn [{ json: {\n  insight_type: dim.insight_type,\n  template_key: dim.template_key,\n  finding: parsed.finding,\n  confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,\n  recommended_change: parsed.recommended_change || null,\n  supporting_data: dim.data\n} }];\n"
+      },
+      "id": "w11n-parsefinding",
+      "name": "Parse Finding",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        80
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/learning_insights",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { insight_type: $json.insight_type, finding: $json.finding, supporting_data: $json.supporting_data, confidence: $json.confidence } }}",
+        "options": {}
+      },
+      "id": "w11n-insertinsight",
+      "name": "Insert learning_insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -336,
+        80
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.first().json;\nconst row = Array.isArray(rows) ? rows[0] : rows;\nconst ctx = $('Parse Finding').item.json;\nreturn [{ json: { ...ctx, insight_id: row.id } }];"
+      },
+      "id": "w11n-flatteninsight",
+      "name": "Flatten Insight Insert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        80
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.confidence }}",
+              "rightValue": 0.7,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "w11n-confidenceif",
+      "name": "Confidence >= 0.7?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        112,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.template_key }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "w11n-mapstotemplateif",
+      "name": "Maps to a Template?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        336,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/prompt_templates?select=template_body,version&template_key=eq.{{ $json.template_key }}&is_active=eq.true&order=version.desc&limit=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w11n-fetchactivetemplate",
+      "name": "Fetch Current Active Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        560,
+        -64
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Flatten Insight Insert').item.json;\nconst rows = $input.all().map(function(i) { return i.json; });\nconst current = rows.length ? rows[0].template_body : null;\nconst currentVersion = rows.length ? rows[0].version : 0;\n\nif (!current) {\n  return [{ json: Object.assign({}, ctx, { skip_rewrite: true }) }];\n}\n\nconst prompt = 'You are improving a content-generation prompt template based on a data-driven insight.\\n\\n' +\n  'CURRENT TEMPLATE (template_key: ' + ctx.template_key + '):\\n' + current + '\\n\\n' +\n  'INSIGHT: ' + ctx.finding + '\\n' +\n  'RECOMMENDED CHANGE: ' + ctx.recommended_change + '\\n\\n' +\n  'Rewrite the template to incorporate this change while preserving its overall structure, placeholders (anything in {{double_braces}}), and intent. Return ONLY the full rewritten template text, no commentary, no markdown fences.';\n\nreturn [{ json: Object.assign({}, ctx, { current_template: current, version: currentVersion, rewrite_prompt: prompt }) }];\n"
+      },
+      "id": "w11n-buildrewriteprompt",
+      "name": "Build Rewrite Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        -64
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.skip_rewrite }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEqual",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "w11n-skiprewriteif",
+      "name": "Has Current Template?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1008,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.rewrite_prompt }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "You rewrite content-generation prompt templates based on performance insights. Always return the complete rewritten template text only, no commentary, no markdown fences, preserve all {{placeholder}} tokens exactly."
+        }
+      },
+      "id": "w11n-aiagentrewrite",
+      "name": "AI Agent: Rewrite Template",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1232,
+        -192
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-pro",
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "w11n-geminirewriteprimary",
+      "name": "Gemini Rewrite Primary",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1248,
+        32
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BM52vHe9rRcBkQE4",
+          "name": "SUGG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "w11n-geminirewritefallback",
+      "name": "Gemini Rewrite Fallback",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1376,
+        32
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BM52vHe9rRcBkQE4",
+          "name": "SUGG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/prompt_templates?template_key=eq.{{ $('Build Rewrite Prompt').item.json.template_key }}&is_active=eq.true",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { is_active: false } }}",
+        "options": {}
+      },
+      "id": "w11n-deactivateold",
+      "name": "Deactivate Old Version",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1584,
+        -192
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/prompt_templates",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { template_key: $('Build Rewrite Prompt').item.json.template_key, version: ($('Build Rewrite Prompt').item.json.version || 1) + 1, template_body: $('AI Agent: Rewrite Template').item.json.output, is_active: true, created_by: 'learning_engine' } }}",
+        "options": {}
+      },
+      "id": "w11n-insertnewversion",
+      "name": "Insert New Template Version",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1808,
+        -192
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/learning_insights?id=eq.{{ $('Build Rewrite Prompt').item.json.insight_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { applied: true, applied_at: $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "w11n-markapplied",
+      "name": "Mark learning_insight Applied",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2032,
+        -192
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BMCRHJH9U",
+          "mode": "id",
+          "cachedResultName": "career-factory-alerts"
+        },
+        "text": "=:brain: Learning Engine updated prompt_templates[{{ $('Build Rewrite Prompt').item.json.template_key }}] based on: {{ $('Build Rewrite Prompt').item.json.recommended_change }}",
+        "otherOptions": {}
+      },
+      "id": "0a2c2af8-d7e0-4d84-bbe8-1b70282c900d",
+      "name": "Slack: Prompt Template Updated",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        2256,
+        -192
+      ],
+      "webhookId": "b94b6d85-09f2-4ad2-b302-6a0f9e65750b",
+      "retryOnFail": true,
+      "credentials": {
+        "slackApi": {
+          "id": "iPNPr0Rubjo42A0J",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "4f41e292-e38d-474d-9903-ed3e9816be39",
+      "name": "Next Dimension",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2480,
+        176
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called (by Analytics)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Combined Analytics Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Combined Analytics Data": {
+      "main": [
+        [
+          {
+            "node": "Compute 6 Insight Dimensions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute 6 Insight Dimensions": {
+      "main": [
+        [
+          {
+            "node": "Loop Dimensions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Dimensions": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Build Finding Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Finding Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent: Synthesize Finding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent: Synthesize Finding": {
+      "main": [
+        [
+          {
+            "node": "Parse Finding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Finding Primary": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent: Synthesize Finding",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Finding Fallback": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent: Synthesize Finding",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Parse Finding": {
+      "main": [
+        [
+          {
+            "node": "Insert learning_insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert learning_insights": {
+      "main": [
+        [
+          {
+            "node": "Flatten Insight Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Insight Insert": {
+      "main": [
+        [
+          {
+            "node": "Confidence >= 0.7?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confidence >= 0.7?": {
+      "main": [
+        [
+          {
+            "node": "Maps to a Template?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Next Dimension",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Maps to a Template?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Current Active Template",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Next Dimension",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Current Active Template": {
+      "main": [
+        [
+          {
+            "node": "Build Rewrite Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Rewrite Prompt": {
+      "main": [
+        [
+          {
+            "node": "Has Current Template?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Current Template?": {
+      "main": [
+        [
+          {
+            "node": "AI Agent: Rewrite Template",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Next Dimension",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent: Rewrite Template": {
+      "main": [
+        [
+          {
+            "node": "Deactivate Old Version",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Rewrite Primary": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent: Rewrite Template",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Rewrite Fallback": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent: Rewrite Template",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Deactivate Old Version": {
+      "main": [
+        [
+          {
+            "node": "Insert New Template Version",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert New Template Version": {
+      "main": [
+        [
+          {
+            "node": "Mark learning_insight Applied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark learning_insight Applied": {
+      "main": [
+        [
+          {
+            "node": "Slack: Prompt Template Updated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: Prompt Template Updated": {
+      "main": [
+        [
+          {
+            "node": "Next Dimension",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Dimension": {
+      "main": [
+        [
+          {
+            "node": "Loop Dimensions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ecddde9c-65a2-4322-a9e7-bd31d491253f",
+  "meta": {
+    "instanceId": "f59fd08d81badd07cb9450cc12cd05722e59eba1c557ed5cd34a2ae43b2d5fe3"
+  },
+  "nodeGroups": [],
+  "id": "VKGVHp8eMKJLBfAW",
+  "tags": []
+}

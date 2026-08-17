@@ -1,0 +1,1392 @@
+{
+  "name": "09_-_Social_Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "course_id",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "w9n-trigger",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -3088,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/video_assets?select=id,video_url,duration_seconds,thumbnail_prompt&course_id=eq.{{ $json.course_id }}&status=eq.ready&order=created_at.desc&limit=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w9n-fetchvideo",
+      "name": "Fetch Ready Video for Course",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2864,
+        128
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "id": "ae52f3d7-1d10-490e-8bc4-68c94fc9d78e"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "w9n-videoreadyif",
+      "name": "Video Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2640,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "D46SUmWUtLZnTbYp",
+          "cachedResultName": "00_Shared_Error_Handler_Sub-Workflow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflowName": "Social Publisher",
+            "nodeName": "Fetch Ready Video for Course",
+            "payload": "={{ $json }}",
+            "errorMessage": "No ready video_asset found for course_id {{ $('When Executed by Another Workflow').item.json.course_id }}",
+            "retryCount": 0,
+            "executionId": "={{ $execution.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflowName",
+              "displayName": "workflowName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "nodeName",
+              "displayName": "nodeName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "errorMessage",
+              "displayName": "errorMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "retryCount",
+              "displayName": "retryCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "executionId",
+              "displayName": "executionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "w9n-novideoerror",
+      "name": "Call Error Handler (No Video)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -2416,
+        224
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(function(i) { return i.json; });\nconst video = rows[0];\nif (!video || !video.id) {\n  throw new Error('No ready video found for this course.');\n}\nreturn [{ json: {\n  course_id: $('When Executed by Another Workflow').item.json.course_id,\n  video_asset_id: video.id,\n  video_url: video.video_url,\n  duration_seconds: video.duration_seconds,\n  thumbnail_prompt: video.thumbnail_prompt\n} }];\n"
+      },
+      "id": "w9n-flattenvideo",
+      "name": "Flatten Video",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2416,
+        32
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/content_items?select=*&course_id=eq.{{ $json.course_id }}&status=eq.draft",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w9n-fetchcontentitems",
+      "name": "Fetch Draft content_items",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2192,
+        32
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(function(i) { return i.json; });\nconst ctx = $('Flatten Video').item.json;\nreturn items.map(function(i) {\n  return { json: Object.assign({}, i, {\n    video_url: ctx.video_url,\n    video_asset_id: ctx.video_asset_id,\n    duration_seconds: ctx.duration_seconds\n  }) };\n});\n"
+      },
+      "id": "w9n-fanoutitems",
+      "name": "Fan Out content_items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1968,
+        32
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "w9n-loopitems",
+      "name": "Loop Content Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1520,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "instagram_reel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "298d2824-8932-4b57-803f-9d8d9c556205"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "youtube_shorts",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "80d1f524-858b-457c-81df-262157dd9fe5"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "linkedin_post",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "d7f59618-a037-45a0-b21b-38543ab4c584"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "facebook_post",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "203e260c-b243-4166-9103-b405e8c6a9ab"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w9n-routeplatform",
+      "name": "Route by Platform",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -1296,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v25.0",
+        "node": "17841424388284668",
+        "edge": "media",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "caption",
+                "value": "={{ $json.body + ' ' + ($json.hashtags || []).map(h => '#' + h).join(' ') }}"
+              },
+              {
+                "name": "video_url",
+                "value": "={{ $json.video_url }}"
+              },
+              {
+                "name": "media_type",
+                "value": "REELS"
+              }
+            ]
+          }
+        }
+      },
+      "id": "w9n-igcreate",
+      "name": "Publish: Instagram (Create Container)",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        -848,
+        -720
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "EM5vOuJTPSuc2RgW",
+          "name": "insta - sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "graphApiVersion": "v25.0",
+        "node": "={{ $json.id }}",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "fields",
+                "value": "status_code"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        -624,
+        -720
+      ],
+      "id": "w9n-igstatus",
+      "name": "Publish: Instagram (Get Status)",
+      "retryOnFail": true,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "EM5vOuJTPSuc2RgW",
+          "name": "insta - sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status_code }}",
+              "rightValue": "FINISHED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "010f5ba8-821e-4662-b20e-3165dffd3088"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w9n-igstatusif",
+      "name": "Publish: Instagram (Finished?)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -400,
+        -784
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 15
+      },
+      "id": "w9n-igwait",
+      "name": "Publish: Instagram (Wait)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -176,
+        -608
+      ],
+      "webhookId": "c2bd2671-e027-4d60-bbd8-8aa3fba0af43"
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v25.0",
+        "node": "17841424388284668",
+        "edge": "media_publish",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "creation_id",
+                "value": "={{ $('Publish: Instagram (Create Container)').item.json.id }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "w9n-igpublish",
+      "name": "Publish: Instagram (Publish)",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        -832
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "EM5vOuJTPSuc2RgW",
+          "name": "insta - sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v25.0/1118290528037373/videos",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { file_url: $json.video_url, description: $json.body + ' ' + ($json.hashtags || []).map(h => '#' + h).join(' ') } }}",
+        "options": {}
+      },
+      "id": "w9n-fbpost",
+      "name": "Publish: Facebook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -176,
+        -208
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TGtJimvoyCRwR0rw",
+          "name": "fb -sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/v2/assets?action=registerUpload",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { registerUploadRequest: { recipes: ['urn:li:digitalmediaRecipe:feedshare-video'], owner: 'urn:li:organization:134614074', serviceRelationships: [{ relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' }] } } }}",
+        "options": {}
+      },
+      "id": "w9n-liregister",
+      "name": "Publish: LinkedIn (Register Upload)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1072,
+        -32
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SvMTP1TwG4dldtjx",
+          "name": "linkeidn - sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Route by Platform').item.json.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "w9n-lidownload",
+      "name": "Publish: LinkedIn (Download Video)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1072,
+        160
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "w9n-limerge",
+      "name": "Publish: LinkedIn (Merge)",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -784,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('Publish: LinkedIn (Register Upload)').first().json.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "w9n-liuploadbytes",
+      "name": "Publish: LinkedIn (Upload Bytes)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -560,
+        -64
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SvMTP1TwG4dldtjx",
+          "name": "linkeidn - sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $('Route by Platform').item.json;\nconst caption = item.body + ' ' + (item.hashtags || []).map(h => '#' + h).join(' ');\nconst asset = $('Publish: LinkedIn (Register Upload)').first().json.value.asset;\n\nreturn [{ json: {\n  author: 'urn:li:organization:134614074',\n  lifecycleState: 'PUBLISHED',\n  specificContent: {\n    'com.linkedin.ugc.ShareContent': {\n      shareCommentary: { text: caption },\n      shareMediaCategory: 'VIDEO',\n      media: [{ status: 'READY', media: asset }]\n    }\n  },\n  visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' }\n} }];"
+      },
+      "id": "w9n-libuildpost",
+      "name": "Publish: LinkedIn (Build Post Body)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        -80
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/v2/ugcPosts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "w9n-licreatepost",
+      "name": "Publish: LinkedIn (Create Post)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -128,
+        -64
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SvMTP1TwG4dldtjx",
+          "name": "linkeidn - sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "w9n-ytdownload",
+      "name": "Publish: YouTube (Download Video)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -848,
+        -400
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $('Route by Platform').item.json.title || $('Route by Platform').item.json.body.slice(0,70) }}",
+        "regionCode": "IN",
+        "categoryId": "27",
+        "options": {
+          "description": "={{ $('Route by Platform').item.json.body + '\\n\\n' + ($('Route by Platform').item.json.hashtags || []).map(h => '#' + h).join(' ') }}"
+        }
+      },
+      "id": "w9n-ytupload",
+      "name": "Publish: YouTube (Upload)",
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        -624,
+        -400
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "4gzD6emUjxclMtiS",
+          "name": "YouTube account -sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/publish_targets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { content_item_id: $json.content_item_id, video_asset_id: $json.video_asset_id, platform: $json.platform, external_post_id: $json.external_post_id, published_at: $now.toISO(), status: 'published' } }}",
+        "options": {}
+      },
+      "id": "w9n-insertpublishtarget",
+      "name": "Insert publish_targets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        272,
+        -320
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/content_items?id=eq.{{ $('Route by Platform').item.json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { status: 'published' } }}",
+        "options": {}
+      },
+      "id": "w9n-markpublished",
+      "name": "Mark content_items Published",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        496,
+        -320
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "w9n-nextitem",
+      "name": "Next Content Item",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        720,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.1-flash-lite-image",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.1-flash-lite-image"
+        },
+        "prompt": "={{ $('Flatten Video').item.json.thumbnail_prompt }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        -400
+      ],
+      "id": "w9n-genthumbnail",
+      "name": "Generate Thumbnail Image",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BM52vHe9rRcBkQE4",
+          "name": "SUGG"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/upload/youtube/v3/thumbnails/set",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "videoId",
+              "value": "={{ $('Publish: YouTube (Upload)').item.json.uploadId }}"
+            },
+            {
+              "name": "uploadType",
+              "value": "media"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "image/jpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -176,
+        -400
+      ],
+      "id": "w9n-ytthumbupload",
+      "name": "Upload YouTube Thumbnail",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "4gzD6emUjxclMtiS",
+          "name": "YouTube account -sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b73c5f57-0dff-41ed-a3bf-7f2d90bcd5ff",
+              "leftValue": "={{ $json.body }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1744,
+        32
+      ],
+      "id": "728fb457-a79a-4f4c-a39d-2cf14b9c8ff8",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const routed = $('Route by Platform').item.json;\nconst resp = $json;\nconst externalId = resp.id;\nreturn [{ json: {\n  content_item_id: routed.id,\n  video_asset_id: routed.video_asset_id,\n  platform: routed.platform,\n  external_post_id: externalId || null\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        -832
+      ],
+      "id": "w9n-shapeig",
+      "name": "Shape IG Publish Target",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const routed = $('Route by Platform').item.json;\nconst resp = $json;\nconst externalId = resp.id;\nreturn [{ json: {\n  content_item_id: routed.id,\n  video_asset_id: routed.video_asset_id,\n  platform: routed.platform,\n  external_post_id: externalId || null\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        -208
+      ],
+      "id": "w9n-shapefb",
+      "name": "Shape FB Publish Target",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const routed = $('Route by Platform').item.json;\nconst resp = $json;\nconst externalId = resp.id || (resp.headers && resp.headers['x-restli-id']);\nreturn [{ json: {\n  content_item_id: routed.id,\n  video_asset_id: routed.video_asset_id,\n  platform: routed.platform,\n  external_post_id: externalId || null\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        -16
+      ],
+      "id": "w9n-shapeli",
+      "name": "Shape LinkedIn Publish Target",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const routed = $('Route by Platform').item.json;\nconst ytResp = $('Publish: YouTube (Upload)').item.json;\nconst externalId = ytResp.id || ytResp.uploadId || null;\nreturn [{ json: {\n  content_item_id: routed.id,\n  video_asset_id: routed.video_asset_id,\n  platform: routed.platform,\n  external_post_id: externalId\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        -400
+      ],
+      "id": "w9n-shapeyt",
+      "name": "Shape YouTube Publish Target",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "course_id": 2
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Fetch Ready Video for Course",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Ready Video for Course": {
+      "main": [
+        [
+          {
+            "node": "Video Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Ready?": {
+      "main": [
+        [
+          {
+            "node": "Flatten Video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Error Handler (No Video)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Video": {
+      "main": [
+        [
+          {
+            "node": "Fetch Draft content_items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Draft content_items": {
+      "main": [
+        [
+          {
+            "node": "Fan Out content_items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fan Out content_items": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Content Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Route by Platform",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Platform": {
+      "main": [
+        [
+          {
+            "node": "Publish: Instagram (Create Container)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Publish: YouTube (Download Video)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Publish: LinkedIn (Register Upload)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Publish: LinkedIn (Download Video)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Publish: Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: Instagram (Create Container)": {
+      "main": [
+        [
+          {
+            "node": "Publish: Instagram (Get Status)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: Instagram (Get Status)": {
+      "main": [
+        [
+          {
+            "node": "Publish: Instagram (Finished?)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: Instagram (Finished?)": {
+      "main": [
+        [
+          {
+            "node": "Publish: Instagram (Publish)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Publish: Instagram (Wait)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: Instagram (Wait)": {
+      "main": [
+        [
+          {
+            "node": "Publish: Instagram (Get Status)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: Instagram (Publish)": {
+      "main": [
+        [
+          {
+            "node": "Shape IG Publish Target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: Facebook": {
+      "main": [
+        [
+          {
+            "node": "Shape FB Publish Target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: LinkedIn (Register Upload)": {
+      "main": [
+        [
+          {
+            "node": "Publish: LinkedIn (Merge)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: LinkedIn (Download Video)": {
+      "main": [
+        [
+          {
+            "node": "Publish: LinkedIn (Merge)",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Publish: LinkedIn (Merge)": {
+      "main": [
+        [
+          {
+            "node": "Publish: LinkedIn (Upload Bytes)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: LinkedIn (Upload Bytes)": {
+      "main": [
+        [
+          {
+            "node": "Publish: LinkedIn (Build Post Body)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: LinkedIn (Build Post Body)": {
+      "main": [
+        [
+          {
+            "node": "Publish: LinkedIn (Create Post)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: LinkedIn (Create Post)": {
+      "main": [
+        [
+          {
+            "node": "Shape LinkedIn Publish Target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: YouTube (Download Video)": {
+      "main": [
+        [
+          {
+            "node": "Publish: YouTube (Upload)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish: YouTube (Upload)": {
+      "main": [
+        [
+          {
+            "node": "Generate Thumbnail Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert publish_targets": {
+      "main": [
+        [
+          {
+            "node": "Mark content_items Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark content_items Published": {
+      "main": [
+        [
+          {
+            "node": "Next Content Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Content Item": {
+      "main": [
+        [
+          {
+            "node": "Loop Content Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Thumbnail Image": {
+      "main": [
+        [
+          {
+            "node": "Upload YouTube Thumbnail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload YouTube Thumbnail": {
+      "main": [
+        [
+          {
+            "node": "Shape YouTube Publish Target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Loop Content Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape IG Publish Target": {
+      "main": [
+        [
+          {
+            "node": "Insert publish_targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape FB Publish Target": {
+      "main": [
+        [
+          {
+            "node": "Insert publish_targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape LinkedIn Publish Target": {
+      "main": [
+        [
+          {
+            "node": "Insert publish_targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape YouTube Publish Target": {
+      "main": [
+        [
+          {
+            "node": "Insert publish_targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1c359b33-8b0e-4be7-acd9-a31028630014",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f59fd08d81badd07cb9450cc12cd05722e59eba1c557ed5cd34a2ae43b2d5fe3"
+  },
+  "nodeGroups": [],
+  "id": "fax6LABh67qyY4u7",
+  "tags": []
+}

@@ -1,0 +1,249 @@
+{
+  "name": "03_-_Trend_Ranking",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "74045394-39c0-4b26-b550-076d89234a37",
+      "name": "When Called (by Trend Discovery)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/trend_history?captured_date=eq.{{ $now.toFormat('yyyy-MM-dd') }}&select=id,courses",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "f1e1a001-0001-4001-8001-fetchtrendrow",
+      "name": "Fetch Today's Trend Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        224,
+        0
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const W_SEARCH  = 0.25;\nconst W_HIRING  = 0.25;\nconst W_DISCUSS = 0.2;\nconst W_NEWS    = 0.15;\nconst W_SOCIAL  = 0.15;\n\nconst rows = $input.all().map(i => i.json);\nconst row = rows[0];\n\nif (!row) {\n  throw new Error('No trend_history row found for today. Run Trend Discovery first.');\n}\n\nconst courses = typeof row.courses === 'string' ? JSON.parse(row.courses) : row.courses;\n\nif (!Array.isArray(courses) || courses.length === 0) {\n  throw new Error('trend_history row found, but courses array is empty. Run Trend Discovery first.');\n}\n\nfunction minMax(arr, key) {\n  const vals = arr.map(c => Number(c[key]) || 0);\n  const min = Math.min(...vals), max = Math.max(...vals);\n  return v => (max === min ? 0 : ((Number(v) || 0) - min) / (max - min));\n}\nconst normSearch  = minMax(courses, 'search_volume');\nconst normHiring  = minMax(courses, 'hiring_demand');\nconst normDiscuss = minMax(courses, 'discussion_count');\nconst normNews    = minMax(courses, 'mentions');\nconst normSocial  = minMax(courses, 'popularity_score');\n\nconst scored = courses.map(c => {\n  const score = 100 * (\n    W_SEARCH  * normSearch(c.search_volume) +\n    W_HIRING  * normHiring(c.hiring_demand) +\n    W_DISCUSS * normDiscuss(c.discussion_count) +\n    W_NEWS    * normNews(c.mentions) +\n    W_SOCIAL  * normSocial(c.popularity_score)\n  );\n  return { ...c, trend_score: Math.round(score * 100) / 100 };\n});\n\nscored.sort((a, b) => b.trend_score - a.trend_score);\nconst top10 = scored.slice(0, 10).map((c, idx) => ({ ...c, rank_position: idx + 1 }));\nconst top10Keys = new Set(top10.map(c => c.normalized_name));\nconst updatedCourses = scored.map(c => top10Keys.has(c.normalized_name)\n  ? top10.find(t => t.normalized_name === c.normalized_name)\n  : c\n);\n\nreturn [{ json: { row_id: row.id, updated_courses: updatedCourses, top10: top10 } }];\n"
+      },
+      "id": "f1e1a002-0002-4002-8002-computetrend",
+      "name": "Compute Trend Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/trend_history?id=eq.{{ $json.row_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { courses: $json.updated_courses } }}",
+        "options": {}
+      },
+      "id": "f1e1a003-0003-4003-8003-writescores",
+      "name": "Write trend_score + rank_position",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        0
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/courses?select=name&last_verified_at=gte.{{ $now.minus({ days: 180 }).toISODate() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        896,
+        0
+      ],
+      "id": "w3n-fetchcovered",
+      "name": "Fetch Recently Covered Courses",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allScored = $('Compute Trend Score').item.json.updated_courses;\nconst coveredRows = $input.first().json;\nconst coveredNames = new Set((Array.isArray(coveredRows) ? coveredRows : []).map(function(r) { return (r.name || '').toLowerCase().trim(); }));\n\nconst SEARCH_POOL_SIZE = 20;\nconst MIN_REQUIRED = 6;\n\nconst pool = allScored.slice(0, SEARCH_POOL_SIZE);\nconst uncovered = pool.filter(function(c) { return !coveredNames.has((c.course_name || '').toLowerCase().trim()); });\nconst pick = uncovered.slice(0, MIN_REQUIRED);\n\nconst shortfallWarning = pick.length < MIN_REQUIRED\n  ? ('Only ' + pick.length + ' uncovered courses found in top ' + SEARCH_POOL_SIZE + ' today, needed ' + MIN_REQUIRED + '.')\n  : null;\nif (shortfallWarning) { console.log('WARNING: ' + shortfallWarning); }\n\nreturn pick.map(function(c, idx) { return { json: {\n  course_name: c.course_name,\n  normalized_name: c.normalized_name,\n  trend_score: c.trend_score,\n  rank_position: idx + 1,\n  shortfall_warning: shortfallWarning\n} }; });\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "w3n-filteruncovered",
+      "name": "Filter Uncovered + Pick Top 6",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/content_queue",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { course_name: $json.course_name, normalized_name: $json.normalized_name, trend_score: $json.trend_score, rank_position: $json.rank_position } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "w3n-insertqueue",
+      "name": "Insert into content_queue",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "When Called (by Trend Discovery)": [
+      {
+        "json": {
+          "id": 2,
+          "workflow_name": "Trend Discovery",
+          "n8n_execution_id": "2421",
+          "status": "success",
+          "items_processed": 0,
+          "items_failed": 0,
+          "error_summary": null,
+          "started_at": "2026-08-06T02:26:07.625798+00:00",
+          "finished_at": "2026-08-06T02:28:15.336+00:00"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Called (by Trend Discovery)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Today's Trend Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Today's Trend Row": {
+      "main": [
+        [
+          {
+            "node": "Compute Trend Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Trend Score": {
+      "main": [
+        [
+          {
+            "node": "Write trend_score + rank_position",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write trend_score + rank_position": {
+      "main": [
+        [
+          {
+            "node": "Fetch Recently Covered Courses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recently Covered Courses": {
+      "main": [
+        [
+          {
+            "node": "Filter Uncovered + Pick Top 6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Uncovered + Pick Top 6": {
+      "main": [
+        [
+          {
+            "node": "Insert into content_queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d323abd6-1281-4048-aaea-fd77c1f1abd3",
+  "meta": {
+    "instanceId": "f59fd08d81badd07cb9450cc12cd05722e59eba1c557ed5cd34a2ae43b2d5fe3"
+  },
+  "nodeGroups": [],
+  "id": "kdl8dTYU63sqANwh",
+  "tags": []
+}

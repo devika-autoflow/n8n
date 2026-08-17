@@ -1,0 +1,900 @@
+{
+  "name": "06_-_Knowledge_Base_Update",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "course_name"
+            },
+            {
+              "name": "mode"
+            }
+          ]
+        }
+      },
+      "id": "db2aa13f-95f0-47ab-9144-6d94087f0c8d",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -640,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{$json.mode}}",
+              "rightValue": "monthly_refresh",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "18156a88-ae02-4cfc-9f10-8c94e5ca2d87",
+      "name": "Mode = monthly_refresh?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/course_facts?select=last_verified_at,courses(name)&last_verified_at=lt.{{ $now.minus({ days: 90 }).toISO() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w6n-findold",
+      "name": "Find Facts > 90 Days Old",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -192,
+        128
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\nconst names = rows.map(r => r.courses ? r.courses.name : null).filter(Boolean);\nreturn names.map(n => ({ json: { course_name: n } }));"
+      },
+      "id": "w6n-extractoldnames",
+      "name": "Extract Course Names",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32,
+        128
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "a9d2q6NZD4ihu3IW",
+          "cachedResultName": "04_-_Research_Engine"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "course_name": "={{ $json.course_name }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "d3034ae2-4449-4688-aa2e-f5bbe308d653",
+      "name": "Execute: Research Engine (Re-verify)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        256,
+        128
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/courses?select=id&name=eq.{{ encodeURIComponent($json.course_name) }}&limit=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w6n-fetchcourseid",
+      "name": "Fetch course_id by Name",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -192,
+        320
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/course_facts?select=course_id,facts,overall_confidence&course_id=eq.{{ $json.id }}&limit=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w6n-fetchfacts",
+      "name": "Fetch Verified course_facts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        32,
+        320
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const courseName = $('Mode = monthly_refresh?').item.json.course_name;\nconst rows = $input.all().map(i => i.json);\nconst row = rows[0];\nif (!row || !row.facts) {\n  return [{ json: { skip: true, reason: 'No verified course_facts found for ' + courseName } }];\n}\nconst facts = row.facts;\nfunction val(key) { return facts[key] ? facts[key].value : null; }\n\nreturn [{\n  json: {\n    course_id: row.course_id,\n    course_name: courseName,\n    description: val('description'),\n    eligibility: val('eligibility'),\n    duration: val('duration'),\n    entrance_exams: val('entrance_exams') || [],\n    emerging_trends: val('emerging_trends'),\n    future_scope: val('future_scope'),\n    career_path: val('career_path'),\n    abroad_opportunities: val('abroad_opportunities'),\n    scholarships: val('scholarships'),\n    government_colleges: val('government_colleges_top3') || [],\n    private_colleges: val('private_colleges_top3') || [],\n    average_salary: val('average_salary_inr'),\n    highest_salary: val('highest_salary_inr'),\n    placement_percent: val('placement_percent'),\n    recruiters: val('recruiters_top5') || [],\n    industry_demand: val('industry_demand'),\n    faq: val('faqs') || [],\n    latest_news: val('news') || [],\n    confidence_score: row.overall_confidence || 0,\n    review_status: (row.overall_confidence || 0) >= 0.8 ? 'verified' : 'flagged'\n  }\n}];\n"
+      },
+      "id": "w6n-buildrecord",
+      "name": "Build Denormalized Course Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        320
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const rec = $('Build Denormalized Course Record').item.json;\nconst rows = [];\n(rec.government_colleges || []).forEach(c => rows.push({ course_id: rec.course_id, name: c.name, type: 'government', city: c.city || null, fees_annual: c.fees_annual_inr || c.fees_annual || null }));\n(rec.private_colleges || []).forEach(c => rows.push({ course_id: rec.course_id, name: c.name, type: 'private', city: c.city || null, fees_annual: c.fees_annual_inr || c.fees_annual || null }));\nreturn [{ json: { course_id: rec.course_id, colleges: rows } }];"
+      },
+      "id": "w6n-synccollegesprep",
+      "name": "Sync colleges (Delete+Insert)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        -160
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/colleges?course_id=eq.{{ $json.course_id }}&deleted_at=is.null",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { deleted_at: $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "w6n-softdeletecolleges",
+      "name": "Soft-Delete Old Colleges",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1152,
+        -160
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/colleges",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Sync colleges (Delete+Insert)').item.json.colleges }}",
+        "options": {}
+      },
+      "id": "w6n-insertcolleges",
+      "name": "Insert colleges",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1376,
+        -160
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/salaries",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { course_id: $('Build Denormalized Course Record').item.json.course_id, average_salary: $('Build Denormalized Course Record').item.json.average_salary, highest_salary: $('Build Denormalized Course Record').item.json.highest_salary, placement_percent: $('Build Denormalized Course Record').item.json.placement_percent, confidence_score: $('Build Denormalized Course Record').item.json.confidence_score, last_verified_at: $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "w6n-upsertsalaries",
+      "name": "Upsert salaries",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        928,
+        32
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rec = $('Build Denormalized Course Record').item.json;\nconst rows = (rec.faq || []).map(f => ({ course_id: rec.course_id, question: f.question || f.q, answer: f.answer || f.a, category: 'faq' }));\nreturn [{ json: { course_id: rec.course_id, faqs: rows } }];"
+      },
+      "id": "w6n-syncfaqprep",
+      "name": "Sync FAQ (Delete+Insert)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        608
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/faq?course_id=eq.{{ $json.course_id }}&deleted_at=is.null",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { deleted_at: $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "w6n-softdeletefaq",
+      "name": "Soft-Delete Old FAQ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1152,
+        608
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/faq",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Sync FAQ (Delete+Insert)').item.json.faqs }}",
+        "options": {}
+      },
+      "id": "w6n-insertfaq",
+      "name": "Insert faq",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1376,
+        608
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rec = $('Build Denormalized Course Record').item.json;\n\nfunction normalizeDate(s) {\n  if (!s) return null;\n  const d = new Date(s);\n  if (isNaN(d.getTime())) return null;\n  return d.toISOString();\n}\n\nconst rows = (rec.latest_news || []).map(n => ({\n  course_id: rec.course_id,\n  headline: n.headline,\n  summary: n.summary,\n  url: n.url,\n  published_at: normalizeDate(n.published_date || n.published_at)\n}));\nreturn [{ json: { news: rows } }];"
+      },
+      "id": "w6n-insertnewsprep",
+      "name": "Insert news",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        800
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/news",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Insert news').item.json.news }}",
+        "options": {}
+      },
+      "id": "w6n-insertnewstable",
+      "name": "Insert into news table",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1152,
+        800
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/audit_log",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { table_name: 'courses', record_id: $('Build Denormalized Course Record').item.json.course_id, action: 'knowledge_base_update', changed_by: 'n8n_workflow_06', diff: { confidence_score: $('Build Denormalized Course Record').item.json.confidence_score, review_status: $('Build Denormalized Course Record').item.json.review_status } } }}",
+        "options": {}
+      },
+      "id": "w6n-writeaudit",
+      "name": "Write audit_log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        928,
+        416
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "wO7e9zHZiOWLOSJV",
+          "cachedResultName": "07_-_Content_Generation"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "course_id": "={{ $('Build Denormalized Course Record').item.json.course_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "course_id",
+              "displayName": "course_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "702b1e71-348e-4bcd-a126-45b83e79e0d0",
+      "name": "Execute: Content Generation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1152,
+        416
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "305a7bbc-c0f5-479e-8439-0659f1594fd5",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        320
+      ],
+      "id": "e7e64002-fa7c-40d4-b091-fac44359f0a3",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/courses?id=eq.{{ $('Build Denormalized Course Record').item.json.course_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { description: $('Build Denormalized Course Record').item.json.description, eligibility: $('Build Denormalized Course Record').item.json.eligibility, duration: $('Build Denormalized Course Record').item.json.duration, entrance_exams: $('Build Denormalized Course Record').item.json.entrance_exams, emerging_trends: $('Build Denormalized Course Record').item.json.emerging_trends, future_scope: $('Build Denormalized Course Record').item.json.future_scope, career_path: $('Build Denormalized Course Record').item.json.career_path, abroad_opportunities: $('Build Denormalized Course Record').item.json.abroad_opportunities, scholarships: $('Build Denormalized Course Record').item.json.scholarships, industry_demand: $('Build Denormalized Course Record').item.json.industry_demand, confidence_score: $('Build Denormalized Course Record').item.json.confidence_score, review_status: $('Build Denormalized Course Record').item.json.review_status, last_verified_at: $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "w6n-upsertcourse",
+      "name": "Upsert courses (Denormalized)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        704,
+        320
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v3/assets",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -528,
+        736
+      ],
+      "id": "3a5e64eb-6484-41e5-8cc2-acfd93edcad4",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "tn20fTIVnANJP5Zd",
+          "name": "Hey gen"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rec = $('Build Denormalized Course Record').item.json;\nconst rows = (rec.recruiters || []).map(function(name) {\n  return { course_id: rec.course_id, role: name, description: null };\n});\nreturn [{ json: { course_id: rec.course_id, careers: rows } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        224
+      ],
+      "id": "w6n-synccareersprep",
+      "name": "Sync careers (Delete+Insert)",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/careers?course_id=eq.{{ $json.course_id }}&deleted_at=is.null",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { deleted_at: $now.toISO() } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1152,
+        224
+      ],
+      "id": "w6n-softdeletecareers",
+      "name": "Soft-Delete Old Careers",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/careers",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Sync careers (Delete+Insert)').item.json.careers }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1376,
+        224
+      ],
+      "id": "w6n-insertcareers",
+      "name": "Insert careers",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "HTTP Request": [
+      {
+        "json": {
+          "data": {
+            "asset_id": "eae674e9c1c5468b9ca300e6a4e5b8ee",
+            "mime_type": "image/png",
+            "size_bytes": 79808,
+            "url": "https://resource2.heygen.ai/image/eae674e9c1c5468b9ca300e6a4e5b8ee/original.png"
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "When Called": [
+      {
+        "json": {
+          "course_name": "B.E.",
+          "mode": null
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Called": {
+      "main": [
+        [
+          {
+            "node": "Mode = monthly_refresh?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mode = monthly_refresh?": {
+      "main": [
+        [
+          {
+            "node": "Find Facts > 90 Days Old",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch course_id by Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Facts > 90 Days Old": {
+      "main": [
+        [
+          {
+            "node": "Extract Course Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Course Names": {
+      "main": [
+        [
+          {
+            "node": "Execute: Research Engine (Re-verify)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch course_id by Name": {
+      "main": [
+        [
+          {
+            "node": "Fetch Verified course_facts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Verified course_facts": {
+      "main": [
+        [
+          {
+            "node": "Build Denormalized Course Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Denormalized Course Record": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync colleges (Delete+Insert)": {
+      "main": [
+        [
+          {
+            "node": "Soft-Delete Old Colleges",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Soft-Delete Old Colleges": {
+      "main": [
+        [
+          {
+            "node": "Insert colleges",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync FAQ (Delete+Insert)": {
+      "main": [
+        [
+          {
+            "node": "Soft-Delete Old FAQ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Soft-Delete Old FAQ": {
+      "main": [
+        [
+          {
+            "node": "Insert faq",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert news": {
+      "main": [
+        [
+          {
+            "node": "Insert into news table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write audit_log": {
+      "main": [
+        [
+          {
+            "node": "Execute: Content Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Upsert courses (Denormalized)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert courses (Denormalized)": {
+      "main": [
+        [
+          {
+            "node": "Sync colleges (Delete+Insert)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upsert salaries",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sync FAQ (Delete+Insert)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Insert news",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write audit_log",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sync careers (Delete+Insert)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync careers (Delete+Insert)": {
+      "main": [
+        [
+          {
+            "node": "Soft-Delete Old Careers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Soft-Delete Old Careers": {
+      "main": [
+        [
+          {
+            "node": "Insert careers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "013be701-ee14-4f76-b537-1f1e2fc369e0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f59fd08d81badd07cb9450cc12cd05722e59eba1c557ed5cd34a2ae43b2d5fe3"
+  },
+  "nodeGroups": [],
+  "id": "39qWGhrL0qYt3L2F",
+  "tags": []
+}

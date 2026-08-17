@@ -1,0 +1,170 @@
+{
+  "name": "07_-_Content_Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "course_id",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "191fe865-6fc0-46a8-9443-fe460c79b097",
+      "name": "When Called (course_id)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2208,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/courses?select=*,salaries(*),colleges(*),careers(*),faq(*),news(*)&id=eq.{{ $json.course_id }}&review_status=eq.verified",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w7n-fetchkb",
+      "name": "Fetch Full KB Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1984,
+        240
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const kb = $input.first().json;\n\nif (!kb.id) {\n  return [{\n    json: {\n      skip: true\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    skip: false,\n    kb\n  }\n}];"
+      },
+      "id": "w7n-checkexists",
+      "name": "Check KB Record Exists",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1760,
+        240
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "a5pMOiPBAYteh45Q",
+          "cachedResultName": "08_-_HeyGen_Video"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "course_id": "={{ $json.kb.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "course_id",
+              "displayName": "course_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "w7n-execheygenonce",
+      "name": "Execute: HeyGen Video (Once Per Course)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -1536,
+        240
+      ],
+      "retryOnFail": true
+    }
+  ],
+  "pinData": {
+    "When Called (course_id)": [
+      {
+        "json": {
+          "course_id": 2
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Called (course_id)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Full KB Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Full KB Record": {
+      "main": [
+        [
+          {
+            "node": "Check KB Record Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check KB Record Exists": {
+      "main": [
+        [
+          {
+            "node": "Execute: HeyGen Video (Once Per Course)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute: HeyGen Video (Once Per Course)": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f8ee85e0-5d5d-4f89-b6d5-96cd4f37073d",
+  "meta": {
+    "instanceId": "f59fd08d81badd07cb9450cc12cd05722e59eba1c557ed5cd34a2ae43b2d5fe3"
+  },
+  "nodeGroups": [],
+  "id": "wO7e9zHZiOWLOSJV",
+  "tags": []
+}

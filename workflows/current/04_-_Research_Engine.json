@@ -1,0 +1,400 @@
+{
+  "name": "04_-_Research_Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "course_name"
+            },
+            {
+              "name": "normalized_name"
+            },
+            {
+              "name": "rank_position",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "7e94c629-11d5-4a29-be07-227870b3735e",
+      "name": "When Called Per Course",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -656,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const c = $input.first().json;\n\nconst schemaFields = `{\n  \"description\": \"string, 2-3 sentences, what this course/degree is\",\n  \"eligibility\": \"string, MUST begin by explicitly stating the exact minimum qualification level required to apply, using one of these precise phrasings: 'Must have passed 10th grade', 'Must have passed 12th grade (Science - PCM)', 'Must have passed 12th grade (Science - PCB)', 'Must have passed 12th grade (Commerce)', 'Must have passed 12th grade (any stream)', 'Must hold a graduate degree (any stream)', 'Must hold a graduate degree in a relevant field', or the correct equivalent for this course. After that opening statement, add minimum marks required and any entrance exam requirement.\",\n  \"duration\": \"string, e.g. '4 years'\",\n  \"entrance_exams\": [\"array of strings, key Indian entrance exams for this course\"],\n  \"emerging_trends\": \"string, current trends in this field in India\",\n  \"future_scope\": \"string, where this field is heading in India over next 5-10 years\",\n  \"career_path\": \"string, typical career progression after this degree\",\n  \"abroad_opportunities\": \"string, options for higher studies/work abroad after this course\",\n  \"scholarships\": \"string, notable scholarships available for this course in India\",\n  \"industry_demand\": \"string, current hiring demand in India for this field\",\n  \"government_colleges_top3\": [\"array of up to 3 objects: {name, city, fees_annual_inr}\"],\n  \"private_colleges_top3\": [\"array of up to 3 objects: {name, city, fees_annual_inr}\"],\n  \"average_salary_inr\": \"number, average annual salary in India in INR\",\n  \"highest_salary_inr\": \"number, highest reported annual salary in India in INR\",\n  \"placement_percent\": \"number, typical placement rate percentage\",\n  \"recruiters_top5\": [\"array of up to 5 top recruiter company names in India\"],\n  \"faqs\": [\"array of up to 5 objects: {question, answer}\"],\n  \"news\": [\"array of up to 3 objects: {headline, summary, url, published_date}\"],\n  \"source_urls\": [\"array of URLs used to ground these facts\"]\n}`;\n\nconst GENERIC_UMBRELLA_DEGREES = ['ba', 'bsc', 'bcom', 'ma', 'msc', 'mcom', 'bs', 'ms'];\nconst isGenericUmbrella = GENERIC_UMBRELLA_DEGREES.includes(String(c.normalized_name || c.course_name || '').trim().toLowerCase());\n\nconst genericDegreeInstruction = isGenericUmbrella\n  ? `\n\nIMPORTANT: \"${c.course_name}\" is a broad umbrella degree name with NO specific specialization or stream given (unlike \"BA Economics\" or \"B.Sc Data Science\"). It covers many different specializations with very different outcomes. Do NOT silently pick one specialization's numbers and present them as if they apply generally. Instead: (1) in the description, explicitly mention it is a general/multidisciplinary degree covering several common specializations (name 3-4 popular ones), (2) for average_salary_inr, highest_salary_inr, and placement_percent, use realistic figures that represent a genuine overall/average across common specializations for this degree in India, not one narrow specialization's figures, (3) career_path and recruiters_top5 should reflect the range of outcomes across the common specializations, not just one.`\n  : '';\n\nconst prompt = `You are researching the Indian graduation course \"${c.course_name}\" for a career guidance platform aimed at Indian Class 12 students and their parents.${genericDegreeInstruction}\n\nUse web search to find CURRENT, ACCURATE, India-specific facts. Do not invent or guess numbers. If a fact cannot be verified, use null for that field rather than fabricating a value.\n\nReturn ONLY valid JSON matching this exact shape (no markdown, no commentary):\n${schemaFields}`;\n\nreturn [{ json: { course_name: c.course_name, normalized_name: c.normalized_name, rank_position: c.rank_position, prompt } }];\n"
+      },
+      "id": "w4n001-buildprompt",
+      "name": "Build Research Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        0
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const src = $('Build Research Prompt').item.json;\nconst resp = $input.first().json;\n\ntry {\n\n  // Read the JSON string from \"output\"\n  const parsed = JSON.parse(resp.output);\n\n  const fields = Object.keys(parsed)\n    .filter(key => key !== 'source_urls')\n    .map(key => ({\n      field_key: key,\n      field_value: parsed[key],\n      model_used: 'gemini',\n      source_urls: parsed.source_urls || []\n    }));\n\n  return [{\n    json: {\n      course_name: src.course_name,\n      normalized_name: src.normalized_name,\n      rank_position: src.rank_position,\n      fields\n    }\n  }];\n\n} catch (e) {\n\n  return [{\n    json: {\n      error: true,\n      message: \"JSON parse failed: \" + e.message\n    }\n  }];\n\n}"
+      },
+      "id": "w4n-parsejson",
+      "name": "Parse Structured JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bxtyomzvyyjngvwwbfqq.supabase.co/rest/v1/research_raw",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { course_name: $json.course_name, n8n_execution_id: $execution.id, fields: $json.fields } }}",
+        "options": {}
+      },
+      "id": "w4n-insertresearch",
+      "name": "Insert research_raw",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1168,
+        -96
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "D46SUmWUtLZnTbYp",
+          "cachedResultName": "00_Shared_Error_Handler_Sub-Workflow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflowName": "Research Engine",
+            "nodeName": "Parse Structured JSON",
+            "payload": "={{ $json }}",
+            "errorMessage": "={{ $json.message }}",
+            "retryCount": 0,
+            "executionId": "={{ $execution.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "30cb8074-d32b-4b91-b764-6a78f0832182",
+      "name": "Call Error Handler (Parse Failed)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1168,
+        96
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "R36zNJvuMpxVOoAr",
+          "cachedResultName": "05_-_Fact_Validation"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "course_name": "={{ $('Parse Structured JSON').item.json.course_name }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "course_name",
+              "displayName": "course_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "ef1ec868-8d73-4e5d-81ed-63b8862acad2",
+      "name": "Execute: Fact Validation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1392,
+        -96
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e95812b8-b55d-4425-b874-e27812fa4e96",
+              "leftValue": "={{ $json.fields }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        944,
+        0
+      ],
+      "id": "56ae4cc7-3c18-48de-80de-85930aebd51b",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.1-pro-preview",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.1-pro-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "builtInTools": {
+          "googleSearch": true
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -208,
+        0
+      ],
+      "id": "w4n-researchprimary",
+      "name": "Research with Google Search (Primary)",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "sanjgJOPV62e0Vul",
+          "name": "n8n"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "builtInTools": {
+          "googleSearch": true
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        128,
+        128
+      ],
+      "id": "w4n-researchfallback",
+      "name": "Research with Google Search (Fallback)",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "sanjgJOPV62e0Vul",
+          "name": "n8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(function(i) { return i.json; });\nconst resp = items[0];\n\nfunction extractText(resp) {\n  const candidate = (resp.candidates && resp.candidates[0]) || null;\n  if (!candidate) return '';\n  const parts = (candidate.content && candidate.content.parts) || [];\n  const texts = parts.map(function(p) { return p.text || ''; }).filter(Boolean);\n  if (!texts.length) return '';\n  const last = texts[texts.length - 1];\n  const firstBrace = last.indexOf('{');\n  const lastBrace = last.lastIndexOf('}');\n  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {\n    return last.slice(firstBrace, lastBrace + 1);\n  }\n  const joined = texts.join('\\n');\n  const fb = joined.indexOf('{');\n  const lb = joined.lastIndexOf('}');\n  if (fb !== -1 && lb !== -1 && lb > fb) return joined.slice(fb, lb + 1);\n  return last;\n}\n\nconst text = extractText(resp);\nreturn [{ json: { output: text } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        0
+      ],
+      "id": "w4n-mergeresearch",
+      "name": "Merge Research Result",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "When Called Per Course": {
+      "main": [
+        [
+          {
+            "node": "Build Research Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Research Prompt": {
+      "main": [
+        [
+          {
+            "node": "Research with Google Search (Primary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Structured JSON": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert research_raw": {
+      "main": [
+        [
+          {
+            "node": "Execute: Fact Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Insert research_raw",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Error Handler (Parse Failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research with Google Search (Primary)": {
+      "main": [
+        [
+          {
+            "node": "Merge Research Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Research with Google Search (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research with Google Search (Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Merge Research Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Research Result": {
+      "main": [
+        [
+          {
+            "node": "Parse Structured JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  }
+}

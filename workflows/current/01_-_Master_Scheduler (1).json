@@ -1,0 +1,818 @@
+{
+  "name": "01_-_Master_Scheduler",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 8
+            }
+          ]
+        }
+      },
+      "id": "e63680ac-30ee-44d8-ad64-e1a284eab6b8",
+      "name": "Every Day 8:00 AM IST",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -704,
+        480
+      ],
+      "notes": "n8n Cron runs in server TZ (assumed UTC). 02:30 UTC = 08:00 IST. Alternatively set N8N_DEFAULT_TIMEZONE=Asia/Kolkata and use '0 0 8 * * *'."
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));\nconst dayOfWeek = now.getDay(); // 0=Sun ... 1=Mon\nconst dayOfMonth = now.getDate();\nconst month = now.getMonth() + 1; // 1-12\nconst isMonday = dayOfWeek === 1;\nconst isFirstOfMonth = dayOfMonth === 1;\nconst isQuarterStart = isFirstOfMonth && [1,4,7,10].includes(month);\n\nreturn [{\n  json: {\n    runDate: now.toISOString(),\n    isMonday,\n    isFirstOfMonth,\n    isQuarterStart\n  }\n}];"
+      },
+      "id": "59c71ac6-c3bc-4f1d-b16d-cabf5cbacb24",
+      "name": "Compute Date Flags",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        480
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Hf6w5kimZQzAlOk9",
+          "cachedResultName": "02_-_Trend_Discovery"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "76c032bb-37a0-4f2f-ab92-338826987e39",
+      "name": "Execute: Trend Discovery",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        640,
+        576
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Compute Date Flags').item.json.isMonday }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "id": "7e625d69-a59b-4776-868b-89cb733b23a4"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "36211880-95e6-4296-aac9-8e4e4d2edb4c",
+      "name": "Is Monday?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Ujbp9WT77pWMi3tH",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/Ujbp9WT77pWMi3tH",
+          "cachedResultName": "10_-_Analytics"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "weekly"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "61082627-3074-4f97-b809-85ab9c3ce0ff",
+      "name": "Execute: Analytics (Weekly Rollup)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        192,
+        192
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Compute Date Flags').item.json.isFirstOfMonth }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "id": "78dd1c0e-073b-4fcd-b708-033821cb1388"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d8784b79-d1ec-403f-8f30-a59a2398cc43",
+      "name": "Is 1st of Month?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "39qWGhrL0qYt3L2F",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/39qWGhrL0qYt3L2F",
+          "cachedResultName": "06_-_Knowledge_Base_Update"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mode": "monthly_refresh"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "course_name",
+              "displayName": "course_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            },
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "b2b4246c-a580-4d05-97c3-c29e72b0d574",
+      "name": "Execute: Monthly Knowledge Refresh",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        192,
+        384
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Compute Date Flags').item.json.isQuarterStart }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "id": "679fd88c-98a2-4813-b4e9-56316062a2d8"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "17d8a72f-471d-4a3f-bbb0-b9b7c9432516",
+      "name": "Is Quarter Start?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "2GLWTZrjXUl60HWI",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/2GLWTZrjXUl60HWI",
+          "cachedResultName": "12_-_Quarterly_Data_Cleanup"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "44581b6f-f0b0-4bc3-867d-4a63c8acad91",
+      "name": "Execute: Quarterly Data Cleanup",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        192,
+        768
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "tableId": "workflow_runs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "workflow_name",
+              "fieldValue": "Master Scheduler"
+            },
+            {
+              "fieldId": "n8n_execution_id",
+              "fieldValue": "={{ $execution.id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "running"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        480
+      ],
+      "id": "e6a19942-c3f7-48fd-b321-b773025b5d45",
+      "name": "Log Run Start",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "workflow_runs",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "n8n_execution_id",
+              "condition": "eq",
+              "keyValue": "={{ $execution.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "success"
+            },
+            {
+              "fieldId": "finished_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        0
+      ],
+      "id": "82792ccd-3761-47a8-abb4-232488cf16cc",
+      "name": "Mark Run Success",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://bxtyomzvyyjngvwwbfqq.supabase.co/rest/v1/content_queue?select=queued_at&order=queued_at.desc&limit=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -16,
+        576
+      ],
+      "id": "w1n-fetchqueuebatch",
+      "name": "Fetch Latest Queue Batch",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(function(i) { return i.json; });\nconst hasRow = items.length > 0 && items[0] && items[0].queued_at;\nif (!hasRow) {\n  return [{ json: { needsResearchCycle: true } }];\n}\nconst lastQueuedAt = new Date(items[0].queued_at);\nconst daysSince = (Date.now() - lastQueuedAt.getTime()) / (1000 * 60 * 60 * 24);\nreturn [{ json: { needsResearchCycle: daysSince >= 5 } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        576
+      ],
+      "id": "w1n-needscycle",
+      "name": "Compute Needs Research Cycle",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.needsResearchCycle }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "id": "cde21118-eef6-4e6c-9496-c5e3f0352537"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        576
+      ],
+      "id": "w1n-needscycleif",
+      "name": "Needs New Research Cycle?"
+    },
+    {
+      "parameters": {
+        "url": "https://bxtyomzvyyjngvwwbfqq.supabase.co/rest/v1/content_queue?consumed=eq.false&order=queued_at.asc&limit=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -32,
+        960
+      ],
+      "id": "w1n-fetchnextqueued",
+      "name": "Fetch Next Queued Course",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "id": "a9da343e-146e-4dfa-950f-f2f77fedccbf"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        960
+      ],
+      "id": "w1n-queuehascourse",
+      "name": "Queue Has Course?",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\n\nreturn [{\n  json: {\n    queue_id: row.id,\n    course_name: row.course_name,\n    normalized_name: row.normalized_name,\n    rank_position: row.rank_position,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        864
+      ],
+      "id": "w1n-flattenpick",
+      "name": "Flatten Queue Pick",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://bxtyomzvyyjngvwwbfqq.supabase.co/rest/v1/content_queue?id=eq.{{ $json.queue_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { consumed: true, consumed_at: $now.toISO() } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        640,
+        864
+      ],
+      "id": "w1n-markconsumed",
+      "name": "Mark Course Consumed",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "a9d2q6NZD4ihu3IW",
+          "cachedResultName": "04_-_Research_Engine"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "course_name": "={{ $('Flatten Queue Pick').item.json.course_name }}",
+            "normalized_name": "={{ $('Flatten Queue Pick').item.json.normalized_name }}",
+            "rank_position": "={{ $('Flatten Queue Pick').item.json.rank_position }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "course_name",
+              "displayName": "course_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "normalized_name",
+              "displayName": "normalized_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "rank_position",
+              "displayName": "rank_position",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        864,
+        864
+      ],
+      "id": "w1n-executedailypick",
+      "name": "Execute: Research Engine (Daily Pick)",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "C0BMCRHJH9U",
+          "cachedResultName": "career-factory-alerts"
+        },
+        "text": "=⚠️ Career Content Factory: content_queue is empty today — no video will be generated. Waiting for the next research cycle to refill it.",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        1056
+      ],
+      "id": "w1n-slackqueueempty",
+      "name": "Notify Slack: Queue Empty",
+      "retryOnFail": true,
+      "webhookId": "817d46d4-7fa8-49fe-b726-dbd706203086"
+    }
+  ],
+  "connections": {
+    "Every Day 8:00 AM IST": {
+      "main": [
+        [
+          {
+            "node": "Compute Date Flags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Date Flags": {
+      "main": [
+        [
+          {
+            "node": "Log Run Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute: Trend Discovery": {
+      "main": [
+        []
+      ]
+    },
+    "Is Monday?": {
+      "main": [
+        [
+          {
+            "node": "Execute: Analytics (Weekly Rollup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is 1st of Month?": {
+      "main": [
+        [
+          {
+            "node": "Execute: Monthly Knowledge Refresh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Quarter Start?": {
+      "main": [
+        [
+          {
+            "node": "Execute: Quarterly Data Cleanup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Run Start": {
+      "main": [
+        [
+          {
+            "node": "Mark Run Success",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Latest Queue Batch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Next Queued Course",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is Monday?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is 1st of Month?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is Quarter Start?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Latest Queue Batch": {
+      "main": [
+        [
+          {
+            "node": "Compute Needs Research Cycle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Needs Research Cycle": {
+      "main": [
+        [
+          {
+            "node": "Needs New Research Cycle?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs New Research Cycle?": {
+      "main": [
+        [
+          {
+            "node": "Execute: Trend Discovery",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Fetch Next Queued Course": {
+      "main": [
+        [
+          {
+            "node": "Queue Has Course?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Has Course?": {
+      "main": [
+        [
+          {
+            "node": "Flatten Queue Pick",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Slack: Queue Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Queue Pick": {
+      "main": [
+        [
+          {
+            "node": "Mark Course Consumed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Course Consumed": {
+      "main": [
+        [
+          {
+            "node": "Execute: Research Engine (Daily Pick)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  }
+}

@@ -1,0 +1,363 @@
+{
+  "name": "00_Shared_Error_Handler_Sub-Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst msg = (item.errorMessage || '').toLowerCase();\nlet category = 'unknown';\nif (msg.includes('rate limit') || msg.includes('429')) category = 'rate_limit';\nelse if (msg.includes('timeout') || msg.includes('econnaborted')) category = 'timeout';\nelse if (msg.includes('5') && msg.match(/5\\d\\d/)) category = 'server_error';\nelse if (msg.includes('401') || msg.includes('403')) category = 'auth';\nelse if (msg.includes('validation') || msg.includes('400')) category = 'validation';\n\nconst retryable = ['rate_limit','timeout','server_error'].includes(category);\nconst maxRetries = category === 'rate_limit' ? 3 : 2;\n\nreturn [{ json: { ...item, errorCategory: category, retryable, maxRetries } }];"
+      },
+      "id": "86a3f227-9563-49a6-a250-128fa1f4e469",
+      "name": "Classify Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        688
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BMCRHJH9U",
+          "mode": "list",
+          "cachedResultName": "career-factory-alerts"
+        },
+        "text": "=🚨 Workflow Failure Alert\n\n🔧 Workflow: {{ $('When Executed by Another Workflow').item.json.workflowName }}\n📍 Failed Node: {{ $('When Executed by Another Workflow').item.json.nodeName }}\n\n📂 Category: {{ $('Classify Error').item.json.errorCategory }}\n🔁 Retries: {{ $('Classify Error').item.json.retryCount }} / {{ $('Classify Error').item.json.maxRetries }} (Exhausted)\n\n❌ Error:\n{{ $('Classify Error').item.json.errorMessage }}\n\n📦 Payload Status:\nA snapshot of the failed payload has been stored in the `dead_letter_queue` for investigation.",
+        "otherOptions": {}
+      },
+      "id": "d98d9ef7-3abd-445a-a8ac-89ec04f72dc6",
+      "name": "Notify Slack #career-factory-alerts",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        688
+      ],
+      "webhookId": "1fba6e02-7ba6-4826-820e-fa8b41bcb2f0",
+      "retryOnFail": true,
+      "credentials": {
+        "slackApi": {
+          "id": "iPNPr0Rubjo42A0J",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "action",
+              "type": "string",
+              "value": "dead_letter"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f8c54c19-2dc1-43ac-a902-e5b3ef3b7593",
+      "name": "Return Dead-Letter Signal",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "devikaraj5885@gmail.com",
+        "subject": "=[Career Content Factory] {{ $('When Executed by Another Workflow').item.json.workflowName }} - Dead Letter",
+        "emailType": "text",
+        "message": "=Workflow: {{ $('When Executed by Another Workflow').item.json.workflowName }}\nNode: {{ $('When Executed by Another Workflow').item.json.nodeName }}\nCategory: {{ $('Classify Error').item.json.errorCategory }}\nError: {{ $('Classify Error').item.json.errorMessage }}\nRetry count: {{ $('Classify Error').item.json.retryCount }}\n\nAction required: review dead_letter_queue table and replay manually.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -64,
+        688
+      ],
+      "id": "1ee5dca5-4710-4254-ad53-52ccdeb56cc4",
+      "name": "Send a message",
+      "webhookId": "c95e523d-7526-4e4d-9284-3b726d0c3f1f",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "drLuzAvHuAghhPeb",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "workflowName"
+            },
+            {
+              "name": "nodeName"
+            },
+            {
+              "name": "payload",
+              "type": "object"
+            },
+            {
+              "name": "errorMessage"
+            },
+            {
+              "name": "retryCount",
+              "type": "number"
+            },
+            {
+              "name": "executionId"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -928,
+        688
+      ],
+      "id": "11761e1e-debd-4ff8-a8d6-26544f8418c6",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/dead_letter_queue",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow_name: $json.workflowName, node_name: $json.nodeName, payload: $json.payload, error_message: $json.errorMessage, retry_count: Number($json.retryCount) || 0 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -480,
+        688
+      ],
+      "id": "0352c7c2-9024-4baa-9662-c266b29ffa33",
+      "name": "Insert into Dead Letter Queue",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/rpc/mark_workflow_failed",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n({\n  p_execution_id: $('When Executed by Another Workflow').item.json.executionId,\n  p_error_message: $('Classify Error').item.json.errorMessage\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -256,
+        688
+      ],
+      "id": "1332be78-e094-44db-a7f8-fd9f6d9f0a17",
+      "name": "Mark Workflow Run Failed",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "workflowName": "HeyGen Video",
+          "nodeName": "POST HeyGen /v2/video/generate",
+          "payload": {
+            "course_id": 2,
+            "course_name": "B.E.",
+            "video_prompt": "Generate this in a single pass with one continuous take per scene. Do not create multiple alternate versions of the whole video. Format the output as a 9:16 vertical video suitable for Instagram Reels and YouTube Shorts. The presenter should remain warm, composed, and calm, speaking clear Indian English at a comfortable pace, with minimal hand and arm movement. Hands should mostly rest naturally, with only occasional, subtle gestures. Avoid frequent gesturing, pointing, or hand-waving. Keep body movement subtle, like a professional news anchor. Keep energy confident and trustworthy, like a knowledgeable older sibling, not a salesperson. Frame every on-camera shot as a medium shot: the presenter should be seated or standing comfortably with head, shoulders, chest, and both hands clearly visible in frame at all times, positioned centered in the middle of the frame with visible space around her, not a tight close-up crop on the face. Never zoom in close on just the face and neck. The framing should look like a natural mid-distance interview or presenter shot, not a passport-photo style close-up. Write approximately 115 to 125 words of spoken dialogue in total, matching a natural speaking pace for a 45 to 50 second video. The video opens on camera in Beat 1 with the presenter delivering the hook: \"Did you know a Bachelor of Engineering degree can reach top packages of 1.31 crore?\" Moving to Beat 2 on camera, the presenter explains: \"To understand why, let's break down this four year undergraduate program. You need 12th Science with Physics, Chemistry, and Maths to qualify.\" In Beat 3, cut away from the presenter to B-roll footage of an Indian student studying technical notes while the presenter narrates: \"Here is the thing. Many parents wonder if engineering is still worth pursuing today.\" In Beat 4, cut away to B-roll of a modern corporate tech office while the presenter narrates: \"Here is what that actually means for your future. With an 85 percent placement rate, most graduates secure job offers quickly. The average salary starts around 6 lakh rupees per year.\" Show bold animated text overlays on screen for the salary and placement statistics mentioned in Beat 4, appearing in sync with the spoken numbers. In Beat 5, cut away to B-roll of software developers collaborating around a screen while the presenter narrates: \"Once you graduate, you can work as a Software Engineer or Data Analyst. Top recruiters like Microsoft, Google, and TCS actively hire graduates. Premier institutes include IIT Madras and BITS.\" In Beat 6, cut back to the presenter on camera to deliver the CTA: \"Prepare for exams like JEE Main, and follow Sugg for your next course guide.\" After the presenter finishes the CTA line, instruct a final closing scene of 4 to 5 seconds on a clean white background showing the attached Sugg logo centered above the attached QR code, with the QR code fully visible directly below it, matching the attached reference images exactly. Keep both the logo and QR code fully visible and completely static for the entire closing scene, do not fade, redraw, crop, distort, animate, or replace either image at any point. Aim for a total video length close to 50 seconds, not exceeding 50 seconds. This is the final creative direction for this single video.",
+            "youtube_thumbnail_prompt": "A professional 16:9 composition for a YouTube thumbnail at 1280x720px featuring a real-looking, confident young Indian presenter in a modern academic tech studio. The background features clean digital screens displaying modern tech concepts and engineering schematics. Bright, warm color palette with high visual contrast. Direct eye contact with the camera, welcoming and trustworthy expression. No text overlays, no logos, no watermarks.",
+            "content_rows": [
+              {
+                "course_id": 2,
+                "platform": "instagram_reel",
+                "title": null,
+                "body": "Thinking about doing a Bachelor of Engineering degree? With so many branches, parents and students wonder if engineering still offers strong career growth. A B.E. degree builds essential skills in software, electronics, and problem-solving for top tech industries. Graduates report an 85 percent placement rate with average salaries of 6 lakh per year, reaching up to 1.31 crore. Top recruiters include Microsoft, Google, and TCS. Prepare for JEE Main or BITSAT, and follow Sugg for complete career insights!",
+                "hashtags": [],
+                "metadata": {},
+                "script_json": {
+                  "hook": "Thinking about doing a Bachelor of Engineering degree?",
+                  "problem": "With so many branches, parents and students wonder if engineering still offers strong career growth.",
+                  "opportunity": "A B.E. degree builds essential skills in software, electronics, and problem-solving for top tech industries.",
+                  "evidence": "Graduates report an 85 percent placement rate with average salaries of 6 lakh per year, reaching up to 1.31 crore. Top recruiters include Microsoft, Google, and TCS.",
+                  "cta": "Prepare for JEE Main or BITSAT, and follow Sugg for complete career insights!"
+                },
+                "status": "draft",
+                "word_count": 78
+              },
+              {
+                "course_id": 2,
+                "platform": "youtube_shorts",
+                "title": "Bachelor of Engineering (B.E.) Career Guide: Salary & Admissions",
+                "body": "Is a Bachelor of Engineering (B.E.) still worth it? Here is everything you need to know in 45 seconds.\n\nB.E. is a 4-year degree covering Computer Science, Mechanical, Civil, and Electronics. To qualify, you need 12th grade Science with PCM and qualifying scores in entrance exams like JEE Main, JEE Advanced, or BITSAT.\n\nThe outcomes speak for themselves: an 85 percent placement rate, an average package of 6 lakh per year, and top international packages reaching up to 1.31 crore. Major recruiters hiring B.E. graduates include Microsoft, Google, TCS, and Infosys.\n\nTop institutes like IIT Madras, IIT Delhi, and BITS offer excellent industry exposure and global prospects. Subscribe to Sugg for complete guidance on entrance exams and admissions!",
+                "hashtags": [],
+                "metadata": {},
+                "script_json": null,
+                "status": "draft",
+                "word_count": 118
+              },
+              {
+                "course_id": 2,
+                "platform": "linkedin_post",
+                "title": null,
+                "body": "Choosing the right undergraduate path after 12th Science is a pivotal decision for students and parents alike. A Bachelor of Engineering (B.E.) remains one of India's most sought-after four-year programs, equipping students with technical expertise across branches like Computer Science, Mechanical, Civil, and Electronics.\n\nEligibility requires 12th Science (PCM) with 50% to 75% marks, along with qualifying entrance exams like JEE Main, JEE Advanced, or BITSAT.\n\nThe career metrics demonstrate strong industry demand. The program boasts an 85% placement rate, with an average starting salary of Rs 6,00,000 per year and highest packages reaching up to Rs 1,31,00,000 per year. Top employers including Microsoft, Google, TCS, Infosys, and L&T actively recruit B.E. graduates for roles as Software Engineers, Data Analysts, and Project Managers.\n\nLeading government institutions like IIT Madras and IIT Delhi, alongside premier private institutes like BITS, continue to drive research and innovation.\n\nAre you or your child planning to pursue a B.E. degree this academic year?",
+                "hashtags": [
+                  "#BachelorOfEngineering",
+                  "#EngineeringCareers",
+                  "#JEEMain",
+                  "#CareerGuidance",
+                  "#HigherEducation"
+                ],
+                "metadata": {},
+                "script_json": null,
+                "status": "draft",
+                "word_count": 158
+              },
+              {
+                "course_id": 2,
+                "platform": "facebook_post",
+                "title": null,
+                "body": "Considering a career in engineering after 12th grade? A Bachelor of Engineering (B.E.) is a 4-year degree that opens doors to high-growth industries like IT, software, AI, and core engineering.\n\nTo get admitted, students need 12th Science with PCM and valid scores in entrance exams like JEE Main, BITSAT, or state CETs. Top colleges like IIT Madras, IIT Delhi, and BITS offer world-class training.\n\nWith an 85% placement rate, an average salary of Rs 6 lakh per year, and top packages going up to Rs 1.31 crore, a B.E. degree offers solid stability and career progression. Top recruiters include Microsoft, Google, TCS, and L&T.\n\nStart preparing for your entrance exams today! Visit Sugg for detailed guides on eligibility, top colleges, and preparation strategies.",
+                "hashtags": [
+                  "#Engineering",
+                  "#JEEMain",
+                  "#CareerGuidance"
+                ],
+                "metadata": {},
+                "script_json": null,
+                "status": "draft",
+                "word_count": 123
+              }
+            ],
+            "video_asset_id": 3,
+            "avatar_look_id": "3e5a6faf2e5842cb945022182960700d",
+            "error": {
+              "message": "400 - \"{\\\"error\\\":{\\\"code\\\":\\\"invalid_parameter\\\",\\\"doc_url\\\":\\\"https://developers.heygen.com/docs/error-codes#invalid-parameter\\\",\\\"message\\\":\\\"Invalid avatar_id: '3e5a6faf2e5842cb945022182960700d'. Avatar not found or you don't have access to it.\\\"}}\\n\"",
+              "name": "AxiosError",
+              "stack": "AxiosError: Request failed with status code 400\n    at settle (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/axios@1.16.1/node_modules/axios/lib/core/settle.js:19:12)\n    at RedirectableRequest.handleResponse (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/axios@1.16.1/node_modules/axios/lib/adapters/http.js:1079:11)\n    at RedirectableRequest.emit (node:events:521:24)\n    at RedirectableRequest._processResponse (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/follow-redirects@1.16.0/node_modules/follow-redirects/index.js:424:10)\n    at ClientRequest.RedirectableRequest._onNativeResponse (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/follow-redirects@1.16.0/node_modules/follow-redirects/index.js:109:12)\n    at Object.onceWrapper (node:events:631:26)\n    at ClientRequest.emit (node:events:509:28)\n    at HTTPParser.parserOnIncomingClient (node:_http_client:798:27)\n    at HTTPParser.parserOnHeadersComplete (node:_http_common:125:17)\n    at TLSSocket.socketOnData (node:_http_client:633:22)\n    at Axios.request (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/axios@1.16.1/node_modules/axios/lib/core/Axios.js:46:41)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at invokeAxios (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+exporter-trace-otlp_ee7aae67fbc5860dfab53924781e08c9/node_modules/n8n-core/src/execution-engine/node-execution-context/utils/request-helper-functions.ts:98:10)\n    at proxyRequestToAxios (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+exporter-trace-otlp_ee7aae67fbc5860dfab53924781e08c9/node_modules/n8n-core/src/execution-engine/node-execution-context/utils/request-helper-functions.ts:448:20)\n    at Object.request (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+exporter-trace-otlp_ee7aae67fbc5860dfab53924781e08c9/node_modules/n8n-core/src/execution-engine/node-execution-context/utils/request-helper-functions.ts:1701:11)",
+              "code": "ERR_BAD_REQUEST",
+              "status": 400
+            }
+          },
+          "errorMessage": "400 - \"{\\\"error\\\":{\\\"code\\\":\\\"invalid_parameter\\\",\\\"doc_url\\\":\\\"https://developers.heygen.com/docs/error-codes#invalid-parameter\\\",\\\"message\\\":\\\"Invalid avatar_id: '3e5a6faf2e5842cb945022182960700d'. Avatar not found or you don't have access to it.\\\"}}\\n\"",
+          "retryCount": 0,
+          "executionId": "2494"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Classify Error": {
+      "main": [
+        [
+          {
+            "node": "Insert into Dead Letter Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Slack #career-factory-alerts": {
+      "main": [
+        [
+          {
+            "node": "Return Dead-Letter Signal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack #career-factory-alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Classify Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert into Dead Letter Queue": {
+      "main": [
+        [
+          {
+            "node": "Mark Workflow Run Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Workflow Run Failed": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "5fb2e01a-18cb-4150-a1d8-110eb489808a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f59fd08d81badd07cb9450cc12cd05722e59eba1c557ed5cd34a2ae43b2d5fe3"
+  },
+  "nodeGroups": [],
+  "id": "D46SUmWUtLZnTbYp",
+  "tags": []
+}

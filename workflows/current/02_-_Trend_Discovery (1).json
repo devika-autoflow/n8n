@@ -1,0 +1,1495 @@
+{
+  "name": "02_-_Trend_Discovery",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "c836c5d4-e963-45b1-926e-882b3bf49fd5",
+      "name": "When Called by Master Scheduler",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1552,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "workflow_runs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "workflow_name",
+              "fieldValue": "Trend Discovery"
+            },
+            {
+              "fieldId": "n8n_execution_id",
+              "fieldValue": "={{ $execution.id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "running"
+            }
+          ]
+        }
+      },
+      "id": "f067831e-0e9b-4da8-92ca-fb74629f48ef",
+      "name": "Log Run Start",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        992
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const serpApiKey = '30dc85594b6bc9ae2a7e51fe94b905068791a233cda4c4842f1529cb5d589feb';\nconst youtubeKey = 'AIzaSyA5IvbXzoAd7F-dtMsKmRwYMlmvPLUduI8';\nconst scraperApiKey = '5347ea1177af02bc7ff736762d88ccb5';\n\nconst sources = [\n  {\n    source_type: 'google_search',\n    name: 'Google Search India',\n    mode: 'api',\n    url: 'https://serpapi.com/search.json',\n    params: {\n      engine: 'google',\n      q: 'trending graduate courses after 12th India',\n      gl: 'in',\n      hl: 'en',\n      api_key: serpApiKey\n    }\n  },\n  {\n    source_type: 'google_news',\n    name: 'Google News India',\n    mode: 'api',\n    url: 'https://serpapi.com/search.json',\n    params: {\n      engine: 'google_news',\n      q: 'trending graduate courses India 2026',\n      gl: 'in',\n      hl: 'en',\n      api_key: serpApiKey\n    }\n  },\n  {\n    source_type: 'youtube',\n    name: 'YouTube India Career',\n    mode: 'api',\n    url: 'https://www.googleapis.com/youtube/v3/search',\n    params: {\n      part: 'snippet',\n      q: 'trending graduate courses India career',\n      order: 'viewCount',\n      regionCode: 'IN',\n      maxResults: 50,\n      key: youtubeKey\n    }\n  },\n  {\n    source_type: 'careers360',\n    name: 'Careers360 Courses (Scraped, JS-rendered)',\n    mode: 'scrape_proxy',\n    url: 'https://www.careers360.com/courses',\n    scraperApiKey: scraperApiKey,\n    render: true\n  }\n];\n\nreturn sources.map(s => ({ json: s }));\n"
+      },
+      "id": "b75834ae-a44b-4a8c-8523-ae17a95ff6f5",
+      "name": "Build Source Config List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        992
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "6f011ada-0e77-4172-a8f1-1940e9244a24",
+      "name": "Loop Sources (SplitInBatches)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2224,
+        992
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url + '?' + Object.entries($json.params).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&') }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "40d534e3-1d34-41f4-8716-80316b080c66",
+      "name": "Call Source API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2672,
+        -48
+      ],
+      "retryOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const src  = $('Loop Sources (SplitInBatches)').item.json;\nconst body = $input.first().json;\nconst items = [];\n\nconst HEADLINE_PATTERNS = [\n  /\\blakh\\b/i, /\\bcrore\\b/i, /\\bresult(s)?\\b/i, /\\btoday\\b/i, /\\byesterday\\b/i,\n  /\\bapply now\\b/i, /\\badmission[s]?\\s+open/i, /\\bregistration/i, /\\bnotification/i,\n  /\\bexam\\s+date/i, /\\bscore\\s?card/i, /\\bmerit\\s+list/i, /\\bcut\\s?off/i,\n  /\\d{1,3}(,\\d{2,3})*\\s*(students|candidates|aspirants)/i,\n  /[;?!]/, /\\bwhat\\s+after\\b/i, /\\bhow\\s+to\\b/i, /\\bnews\\b/i,\n  /\\d{4}-\\d{2}-\\d{2}/, /\\b20\\d{2}\\b/, /\\bdeclared\\b/i, /\\breleased\\b/i\n];\nfunction looksLikeHeadline(name) {\n  return HEADLINE_PATTERNS.some(function(p) { return p.test(name); });\n}\n\nfunction push(courseName, fields) {\n  if (!courseName) return;\n  const name = String(courseName).trim();\n  if (name.length < 2 || name.length > 100) return;\n  if (looksLikeHeadline(name)) return;\n  items.push({\n    course_name:      name,\n    normalized_name:  name.toLowerCase(),\n    source_type:      src.source_type,\n    search_volume:    Number(fields.search_volume)    || 0,\n    popularity_score: Number(fields.popularity_score) || 0,\n    hiring_demand:    Number(fields.hiring_demand)    || 0,\n    mentions:         Number(fields.mentions)         || 0,\n    discussion_count: Number(fields.discussion_count) || 0,\n    growth_pct:       Number(fields.growth_pct)       || 0,\n    raw:              fields.raw                      || {}\n  });\n}\n\nfunction extractCoursesFromHTML(html) {\n  if (!html || typeof html !== 'string') return [];\n  const text = html\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ')\n    .replace(/\\s+/g, ' ').trim();\n  const patterns = [\n    /B\\.?\\s?Tech[^\\n,<]{0,40}/gi, /M\\.?\\s?Tech[^\\n,<]{0,40}/gi,\n    /MBBS[^\\n,<]{0,30}/gi,        /BDS[^\\n,<]{0,30}/gi,\n    /MBA[^\\n,<]{0,40}/gi,         /PGDM[^\\n,<]{0,40}/gi,\n    /BCA[^\\n,<]{0,30}/gi,         /MCA[^\\n,<]{0,30}/gi,\n    /BBA[^\\n,<]{0,30}/gi,         /B\\.?\\s?Sc[^\\n,<]{0,40}/gi,\n    /B\\.?\\s?Com[^\\n,<]{0,30}/gi,  /LLB[^\\n,<]{0,30}/gi,\n    /B\\.?\\s?Arch[^\\n,<]{0,30}/gi, /B\\.?\\s?Pharm[^\\n,<]{0,30}/gi,\n    /\\bCA\\b[^\\n,<]{0,30}/g,\n    /Diploma in [A-Z][a-zA-Z\\s]{3,40}/g,\n    /Bachelor of [A-Z][a-zA-Z\\s]{3,50}/g,\n    /Master of [A-Z][a-zA-Z\\s]{3,50}/g,\n  ];\n  const found = new Set();\n  patterns.forEach(p => {\n    (text.match(p) || []).slice(0, 5).forEach(m => {\n      const clean = m.trim().replace(/[|•·–—]/g, '').trim();\n      if (clean.length > 2 && clean.length < 80) found.add(clean);\n    });\n  });\n  return [...found];\n}\n\n\ntry {\n  switch (src.source_type) {\n\n    case 'google_trends': {\n      const rising = body.related_queries?.rising || [];\n      const top    = body.related_queries?.top    || [];\n      const list   = rising.length ? rising : top;\n      list.forEach(i => push(i.query, {\n        search_volume: i.value || 0,\n        growth_pct:    i.value || 0,\n        raw: i\n      }));\n      break;\n    }\n\n    case 'google_news': {\n      (body.news_results || []).forEach(i => {\n        extractCoursesFromHTML(i.title || '').forEach(name => push(name, {\n          mentions: 1,\n          raw: { title: i.title, source: i.source?.name || '', date: i.date || '' }\n        }));\n      });\n      break;\n    }\n\n    case 'youtube': {\n      (body.items || []).forEach(i => {\n        const title = i.snippet?.title || '';\n        extractCoursesFromHTML(title).forEach(name => push(name, {\n          mentions: 1,\n          popularity_score: Number(i.statistics?.viewCount) || 0,\n          raw: { title, channel: i.snippet?.channelTitle, videoId: i.id?.videoId }\n        }));\n      });\n      break;\n    }\n\n    case 'naukri':\n    case 'indeed': {\n      if (body.jobs)       { body.jobs.forEach(j => push(j.title, { hiring_demand: 1, raw: j })); break; }\n      if (body.jobDetails) { body.jobDetails.forEach(j => push(j.title || j.jobTitle, { hiring_demand: 1, raw: j })); break; }\n      const h1 = typeof body === 'string' ? body : (body.body || JSON.stringify(body));\n      extractCoursesFromHTML(h1).forEach(n => push(n, { hiring_demand: 1, raw: { method: 'html_extract' } }));\n      break;\n    }\n\n    case 'shiksha':\n    case 'careers360':\n    case 'collegedekho': {\n      if (body.courses)        { body.courses.forEach(c => push(c.name || c.courseName || c.title, { popularity_score: c.count || c.collegesCount || 0, raw: c })); break; }\n      if (body.data?.courses)  { body.data.courses.forEach(c => push(c.name, { popularity_score: c.count || 0, raw: c })); break; }\n      const h2 = typeof body === 'string' ? body : (body.body || JSON.stringify(body));\n      extractCoursesFromHTML(h2).forEach(n => push(n, { popularity_score: 1, raw: { method: 'html_extract' } }));\n      break;\n    }\n\n    case 'aicte': {\n      if (body.programs) { body.programs.forEach(p => push(p.name || p.program, { popularity_score: p.intake || 0, raw: p })); break; }\n      const h3 = typeof body === 'string' ? body : (body.body || JSON.stringify(body));\n      extractCoursesFromHTML(h3).forEach(n => push(n, { popularity_score: 1, raw: { method: 'html_extract' } }));\n      break;\n    }\n\n    case 'ugc':\n    case 'nasscom':\n    case 'nsdc': {\n      const h4 = typeof body === 'string' ? body : (body.body || JSON.stringify(body));\n      extractCoursesFromHTML(h4).forEach(n => push(n, { mentions: 1, raw: { method: 'html_extract' } }));\n      break;\n    }\ncase 'wiki_courses':\ncase 'wiki_engineering':\ncase 'wiki_medical':\ncase 'wiki_management':\ncase 'wiki_law':\ncase 'wiki_professional': {\n  // Wikipedia pages are clean static HTML\n  // extractCoursesFromHTML pulls degree names from the text\n  const html = typeof body === 'string' ? body : (body.body || JSON.stringify(body));\n  extractCoursesFromHTML(html).forEach(n => {\n    push(n, { popularity_score: 1, raw: { source: src.source_type, method: 'html_extract' } });\n  });\n  break;\n}\n\n    case 'careers360': {\n      const html = typeof body === 'string' ? body : (body.body || JSON.stringify(body));\n      extractCoursesFromHTML(html).forEach(n => push(n, { popularity_score: 1, raw: { method: 'scrape_html_extract' } }));\n      break;\n    }\n\n    default: {\n      return [{ json: { error: true, source_type: src.source_type, message: 'No parser defined', empty: false } }];\n    }\n  }\n} catch (e) {\n  return [{ json: { error: true, source_type: src.source_type, message: e.message, empty: false } }];\n}\n\nif (items.length === 0) {\n  return [{ json: { source_type: src.source_type, empty: true } }];\n}\n\n// Return ONE item with all courses from this source\nreturn [{ json: { source_type: src.source_type, item_count: items.length, items: items } }];\n"
+      },
+      "id": "c5bdb99f-93ab-4b83-bbb0-9c316589b160",
+      "name": "Normalize to Common Shape",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3568,
+        560
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.error }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              },
+              "id": "f55010a5-37f6-42e1-a95b-6d66e58f9004"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1fefddb-db42-4e2d-a831-3440576e37fa",
+      "name": "Normalize OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "D46SUmWUtLZnTbYp",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/D46SUmWUtLZnTbYp",
+          "cachedResultName": "00_Shared_Error_Handler_Sub-Workflow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflowName": "Trend Discovery",
+            "nodeName": "Call Source API / Call Scrape Proxy",
+            "payload": "={{$json}}",
+            "errorMessage": "={{$json.error?.message || 'HTTP fetch failed'}}",
+            "retryCount": 0,
+            "executionId": "={{ $execution.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflowName",
+              "displayName": "workflowName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "nodeName",
+              "displayName": "nodeName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "payload",
+              "displayName": "payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "errorMessage",
+              "displayName": "errorMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "retryCount",
+              "displayName": "retryCount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            },
+            {
+              "id": "executionId",
+              "displayName": "executionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "1d2b4281-88e0-4adb-9fdf-f9cb93a834cb",
+      "name": "Call Error Handler (Fetch Failed)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3568,
+        -64
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "D46SUmWUtLZnTbYp",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflowName": "Trend Discovery",
+            "nodeName": "Normalize to Common Shape",
+            "payload": "={{$json}}",
+            "errorMessage": "={{$json.message}}",
+            "retryCount": 0,
+            "executionId": "={{ $execution.id }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "44a03a16-6bd6-4a95-9b36-9c344daa193f",
+      "name": "Call Error Handler (Normalize Failed)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        5264,
+        160
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "d7ad610c-0cce-4c64-8080-b0c2b5f6a5e0",
+      "name": "Next Source",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        5488,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// All items from all sources arrive here after loop completes\nconst allItems = $input.all().map(i => i.json);\n\n// Filter out empty/error items\nconst validItems = allItems.filter(i => !i.error && !i.empty && Array.isArray(i.items));\n\n// Flatten all course arrays from all sources into one list\nconst allCourses = [];\nvalidItems.forEach(sourceResult => {\n  sourceResult.items.forEach(course => {\n    allCourses.push(course);\n  });\n});\n\n// Deduplicate by normalized_name — merge scores when same course appears in multiple sources\nconst merged = {};\nallCourses.forEach(item => {\n  const key = item.normalized_name;\n  if (!merged[key]) {\n    merged[key] = {\n      course_name:      item.course_name,\n      normalized_name:  item.normalized_name,\n      sources:          [item.source_type],\n      search_volume:    item.search_volume    || 0,\n      popularity_score: item.popularity_score || 0,\n      hiring_demand:    item.hiring_demand    || 0,\n      mentions:         item.mentions         || 0,\n      discussion_count: item.discussion_count || 0,\n      growth_pct:       item.growth_pct       || 0,\n    };\n  } else {\n    merged[key].search_volume    += item.search_volume    || 0;\n    merged[key].popularity_score += item.popularity_score || 0;\n    merged[key].hiring_demand    += item.hiring_demand    || 0;\n    merged[key].mentions         += item.mentions         || 0;\n    merged[key].discussion_count += item.discussion_count || 0;\n    merged[key].growth_pct       += item.growth_pct       || 0;\n    if (!merged[key].sources.includes(item.source_type)) {\n      merged[key].sources.push(item.source_type);\n    }\n  }\n});\n\nconst finalList = Object.values(merged);\n\nreturn [{\n  json: {\n    captured_date:  new Date().toISOString().split('T')[0],\n    total_courses:  finalList.length,\n    source_count:   validItems.length,\n    courses:        finalList\n  }\n}];\n"
+      },
+      "id": "17429291-30dd-4248-8002-725e5837bfb8",
+      "name": "Combine All Courses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2448,
+        992
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "tableId": "trend_history",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "captured_date",
+              "fieldValue": "={{ $json.captured_date }}"
+            },
+            {
+              "fieldId": "total_courses",
+              "fieldValue": "={{ $json.total_courses }}"
+            },
+            {
+              "fieldId": "source_count",
+              "fieldValue": "={{ $json.source_count }}"
+            },
+            {
+              "fieldId": "courses",
+              "fieldValue": "={{ JSON.stringify($json.courses) }}"
+            }
+          ]
+        }
+      },
+      "id": "a7ca44fc-b31b-4b52-a045-08f666afb06d",
+      "name": "Save to trend_history",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3120,
+        992
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "workflow_runs",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "n8n_execution_id",
+              "condition": "eq",
+              "keyValue": "={{ $execution.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "success"
+            },
+            {
+              "fieldId": "finished_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "94b64f36-08b7-4930-b32d-00662b6ac037",
+      "name": "Mark Run Complete",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3344,
+        992
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "kdl8dTYU63sqANwh",
+          "cachedResultName": "03_-_Trend_Ranking"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "e2f6a001-11aa-4a11-9c3a-trendranking01",
+      "name": "Execute: Trend Ranking",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3568,
+        992
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "api",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "ab98384a-324f-4f75-bb24-9c045d608586"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mode }}",
+                    "rightValue": "scrape_proxy",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "016c2090-81ef-4fbe-9c34-332dcea63c98"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w2n-routebyfetchmode",
+      "name": "Route by Fetch Mode",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2448,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=http://api.scraperapi.com/?api_key={{ $json.scraperApiKey }}&url={{ encodeURIComponent($json.url) }}&render={{ $json.render }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "id": "w2n-callscrapeproxy",
+      "name": "Call Scrape Proxy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3344,
+        800
+      ],
+      "retryOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Loop Sources (SplitInBatches)').item.json.source_type }}",
+              "rightValue": "google_news",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "gn-check-1"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2896,
+        128
+      ],
+      "id": "w2n-isnews",
+      "name": "Is Google News Source?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\nconst results = (body.news_results || []).slice(0, 3);\nif (!results.length) return [];\nreturn results.map(function(r) {\n  return { json: { link: r.link, title: r.title || '', source_name: (r.source && r.source.name) || '' } };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3568,
+        128
+      ],
+      "id": "w2n-picktop3",
+      "name": "Pick Top 3 News Articles",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.link }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3792,
+        128
+      ],
+      "id": "w2n-fetcharticle",
+      "name": "Fetch Article HTML",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function stripBoilerplateTags(fragment) {\n  return fragment\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<nav[\\s\\S]*?<\\/nav>/gi, '')\n    .replace(/<header[\\s\\S]*?<\\/header>/gi, '')\n    .replace(/<footer[\\s\\S]*?<\\/footer>/gi, '')\n    .replace(/<aside[\\s\\S]*?<\\/aside>/gi, '')\n    .replace(/<form[\\s\\S]*?<\\/form>/gi, '')\n    .replace(/<svg[\\s\\S]*?<\\/svg>/gi, '')\n    .replace(/<noscript[\\s\\S]*?<\\/noscript>/gi, '')\n    .replace(/<iframe[\\s\\S]*?<\\/iframe>/gi, '')\n    .replace(/<!--[\\s\\S]*?-->/g, '');\n}\n\nfunction tagsToText(fragment) {\n  return fragment\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\")\n    .replace(/\\s+/g, ' ').trim();\n}\n\nfunction extractArticleText(html) {\n  const noHead = html.replace(/<head[\\s\\S]*?<\\/head>/i, '');\n  const cleaned = stripBoilerplateTags(noHead);\n\n  const CONTENT_PATTERNS = [\n    /<article[^>]*>([\\s\\S]*?)<\\/article>/i,\n    /<main[^>]*>([\\s\\S]*?)<\\/main>/i,\n    /<div[^>]*class=\"[^\"]*(?:articleBody|story-body|post-content|entry-content|article-content|article-body|content-body)[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i,\n    /<div[^>]*(?:role|itemprop)=\"(?:main|articleBody)\"[^>]*>([\\s\\S]*?)<\\/div>/i\n  ];\n\n  for (const pattern of CONTENT_PATTERNS) {\n    const m = cleaned.match(pattern);\n    if (m && m[1]) {\n      const text = tagsToText(m[1]);\n      if (text.length > 200) return text;\n    }\n  }\n\n  const bodyMatch = cleaned.match(/<body[^>]*>([\\s\\S]*?)<\\/body>/i);\n  const scope = bodyMatch && bodyMatch[1] ? bodyMatch[1] : cleaned;\n  return tagsToText(scope);\n}\n\ntry {\n  const raw = $json.data || $json.body || $json;\n  const html = typeof raw === 'string' ? raw : JSON.stringify(raw);\n  const isFetchError = !html || html.length < 50 || $json.error;\n  let link = '', title = '', source_name = '';\n  try {\n    const src = $('Pick Top 3 News Articles').item.json;\n    link = src.link || ''; title = src.title || ''; source_name = src.source_name || '';\n  } catch (e2) {}\n  if (isFetchError) {\n    return { json: { link: link, title: title, source_name: source_name, article_text: '', fetch_failed: true } };\n  }\n  const text = extractArticleText(html);\n  return { json: { link: link, title: title, source_name: source_name, article_text: text.slice(0, 9000), fetch_failed: false } };\n} catch (outerErr) {\n  return { json: { link: '', title: '', source_name: '', article_text: '', fetch_failed: true, strip_error: String(outerErr && outerErr.message || outerErr) } };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4016,
+        128
+      ],
+      "id": "w2n-striphtml",
+      "name": "Strip HTML to Text",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(function(i) { return i.json; }).filter(function(it) { return !it.fetch_failed && it.article_text; });\nif (!items.length) {\n  return [{ json: { prompt_text: '', article_count: 0 } }];\n}\nconst blocks = items.map(function(it, idx) {\n  return 'ARTICLE ' + (idx + 1) + ' (source: ' + (it.source_name || 'unknown') + ', headline: \"' + it.title + '\"):\\n' + it.article_text;\n});\nreturn [{ json: { prompt_text: blocks.join('\\n\\n---\\n\\n'), article_count: items.length } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4240,
+        128
+      ],
+      "id": "w2n-combinetexts",
+      "name": "Combine Article Texts",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.1-flash-lite-preview",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.1-flash-lite-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ \"You are extracting real Indian graduate/degree course names mentioned in the following news article text. Only extract full course/degree names that are actually named in this text - e.g. B.Tech, B.Sc, BBA, MBA, B.Com, BCA, Diploma in X, Bachelor of X. Ignore exam names, salary figures, unrelated career-advice fluff, and university/college names alone (a college name without a course name attached is not a course). If the article text is empty or contains no real course names, return an empty array.\\n\\nReturn ONLY a JSON array of strings, nothing else, no markdown fences. Example: [\\\"B.Tech Computer Science\\\", \\\"B.Sc Data Science\\\"]\\n\\nARTICLE TEXT:\\n\" + $json.prompt_text }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        4464,
+        128
+      ],
+      "id": "w2n-extractai",
+      "name": "Extract Courses from News (AI)",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "sanjgJOPV62e0Vul",
+          "name": "n8n"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const HEADLINE_PATTERNS = [\n  /\\blakh\\b/i, /\\bcrore\\b/i, /\\bresult(s)?\\b/i, /\\btoday\\b/i, /\\byesterday\\b/i,\n  /\\bapply now\\b/i, /\\badmission[s]?\\s+open/i, /\\bregistration/i, /\\bnotification/i,\n  /\\bexam\\s+date/i, /\\bscore\\s?card/i, /\\bmerit\\s+list/i, /\\bcut\\s?off/i,\n  /[;?!]/, /\\bwhat\\s+after\\b/i, /\\bhow\\s+to\\b/i, /\\bnews\\b/i,\n  /\\d{4}-\\d{2}-\\d{2}/, /\\bdeclared\\b/i, /\\breleased\\b/i\n];\nfunction looksLikeHeadline(name) { return HEADLINE_PATTERNS.some(function(p) { return p.test(name); }); }\n\nfunction extractArrayText(resp) {\n  try {\n    const candidate = (resp.candidates && resp.candidates[0]) || null;\n    if (!candidate) return '';\n    const parts = (candidate.content && candidate.content.parts) || [];\n    const texts = parts.map(function(p) { return p.text || ''; }).filter(Boolean);\n    return texts.join('\\n');\n  } catch (e) { return ''; }\n}\n\nlet items = [];\ntry {\n  const resp = $input.first().json;\n  const text = extractArrayText(resp);\n  const fb = text.indexOf('[');\n  const lb = text.lastIndexOf(']');\n  const jsonSlice = (fb !== -1 && lb !== -1 && lb > fb) ? text.slice(fb, lb + 1) : '[]';\n  const names = JSON.parse(jsonSlice);\n  const seen = new Set();\n  (Array.isArray(names) ? names : []).forEach(function(raw) {\n    if (!raw) return;\n    const name = String(raw).trim();\n    if (name.length < 2 || name.length > 100) return;\n    if (looksLikeHeadline(name)) return;\n    const norm = name.toLowerCase();\n    if (seen.has(norm)) return;\n    seen.add(norm);\n    items.push({\n      course_name: name,\n      normalized_name: norm,\n      source_type: 'google_news',\n      search_volume: 0,\n      popularity_score: 1,\n      hiring_demand: 0,\n      mentions: 1,\n      discussion_count: 0,\n      growth_pct: 0,\n      raw: { method: 'ai_article_extract' }\n    });\n  });\n} catch (e) {\n  items = [];\n}\n\nif (items.length === 0) {\n  return [{ json: { source_type: 'google_news', empty: true } }];\n}\nreturn [{ json: { source_type: 'google_news', item_count: items.length, items: items } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4816,
+        128
+      ],
+      "id": "w2n-parseailist",
+      "name": "Parse AI Course List",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Loop Sources (SplitInBatches)').item.json.source_type }}",
+              "rightValue": "youtube",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "yt-check-1"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        320
+      ],
+      "id": "w2n-isyoutube",
+      "name": "Is YouTube Source?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\nconst results = (body.items || []).slice(0, 3);\nif (!results.length) return [];\nreturn results.map(function(r) {\n  const videoId = (r.id && r.id.videoId) || '';\n  return { json: {\n    link: videoId ? ('https://www.youtube.com/watch?v=' + videoId) : '',\n    title: (r.snippet && r.snippet.title) || '',\n    source_name: (r.snippet && r.snippet.channelTitle) || 'YouTube'\n  } };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3568,
+        320
+      ],
+      "id": "w2n-pickyt3",
+      "name": "Pick Top 3 YouTube Videos",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(function(i) { return i.json; }).filter(function(it) { return !it.fetch_failed && it.article_text; });\nif (!items.length) {\n  return [{ json: { prompt_text: '', video_count: 0 } }];\n}\nconst blocks = items.map(function(it, idx) {\n  return 'VIDEO ' + (idx + 1) + ' (channel: ' + (it.source_name || 'unknown') + ', title: \"' + it.title + '\"):\\n' + it.article_text;\n});\nreturn [{ json: { prompt_text: blocks.join('\\n\\n---\\n\\n'), video_count: items.length } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4240,
+        320
+      ],
+      "id": "w2n-combineyt",
+      "name": "Combine YouTube Texts",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ \"You are extracting real Indian graduate/degree course names mentioned in the following YouTube video titles and descriptions (career/education channel content). Only extract full course/degree names actually named in this text - e.g. B.Tech, B.Sc, BBA, MBA, B.Com, BCA, Diploma in X, Bachelor of X. Ignore generic career-advice fluff, salary discussion with no named course, channel branding/subscribe prompts, and job-role names that aren't tied to a specific course. If nothing qualifies, return an empty array.\\n\\nReturn ONLY a JSON array of strings, nothing else, no markdown fences. Example: [\\\"B.Tech Computer Science\\\", \\\"MBA Finance\\\"]\\n\\nVIDEO TEXT:\\n\" + $json.prompt_text }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "builtInTools": {
+          "googleSearch": true
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        4464,
+        320
+      ],
+      "id": "w2n-extractytai",
+      "name": "Extract Courses from YouTube (AI)",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "sanjgJOPV62e0Vul",
+          "name": "n8n"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const HEADLINE_PATTERNS = [\n  /\\blakh\\b/i, /\\bcrore\\b/i, /\\bresult(s)?\\b/i, /\\btoday\\b/i, /\\byesterday\\b/i,\n  /\\bapply now\\b/i, /\\badmission[s]?\\s+open/i, /\\bregistration/i, /\\bnotification/i,\n  /\\bexam\\s+date/i, /\\bscore\\s?card/i, /\\bmerit\\s+list/i, /\\bcut\\s?off/i,\n  /[;?!]/, /\\bwhat\\s+after\\b/i, /\\bhow\\s+to\\b/i, /\\bnews\\b/i,\n  /\\d{4}-\\d{2}-\\d{2}/, /\\bdeclared\\b/i, /\\breleased\\b/i\n];\nfunction looksLikeHeadline(name) { return HEADLINE_PATTERNS.some(function(p) { return p.test(name); }); }\n\nfunction extractArrayText(resp) {\n  try {\n    const candidate = (resp.candidates && resp.candidates[0]) || null;\n    if (!candidate) return '';\n    const parts = (candidate.content && candidate.content.parts) || [];\n    const texts = parts.map(function(p) { return p.text || ''; }).filter(Boolean);\n    return texts.join('\\n');\n  } catch (e) { return ''; }\n}\n\nlet items = [];\ntry {\n  const resp = $input.first().json;\n  const text = extractArrayText(resp);\n  const fb = text.indexOf('[');\n  const lb = text.lastIndexOf(']');\n  const jsonSlice = (fb !== -1 && lb !== -1 && lb > fb) ? text.slice(fb, lb + 1) : '[]';\n  const names = JSON.parse(jsonSlice);\n  const seen = new Set();\n  (Array.isArray(names) ? names : []).forEach(function(raw) {\n    if (!raw) return;\n    const name = String(raw).trim();\n    if (name.length < 2 || name.length > 100) return;\n    if (looksLikeHeadline(name)) return;\n    const norm = name.toLowerCase();\n    if (seen.has(norm)) return;\n    seen.add(norm);\n    items.push({\n      course_name: name,\n      normalized_name: norm,\n      source_type: 'youtube',\n      search_volume: 0,\n      popularity_score: 1,\n      hiring_demand: 0,\n      mentions: 1,\n      discussion_count: 0,\n      growth_pct: 0,\n      raw: { method: 'ai_video_extract' }\n    });\n  });\n} catch (e) {\n  items = [];\n}\n\nif (items.length === 0) {\n  return [{ json: { source_type: 'youtube', empty: true } }];\n}\nreturn [{ json: { source_type: 'youtube', item_count: items.length, items: items } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4816,
+        320
+      ],
+      "id": "w2n-parseytlist",
+      "name": "Parse AI YouTube Course List",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.link }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3792,
+        320
+      ],
+      "id": "w2n-fetchytwatch",
+      "name": "Fetch YouTube Watch Page",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "try {\n  const raw = $json.data || $json.body || $json;\n  const html = typeof raw === 'string' ? raw : JSON.stringify(raw);\n  const isFetchError = !html || html.length < 50 || $json.error;\n  let link = '', title = '', source_name = '';\n  try {\n    const src = $('Pick Top 3 YouTube Videos').item.json;\n    link = src.link || ''; title = src.title || ''; source_name = src.source_name || '';\n  } catch (e2) {}\n  if (isFetchError) {\n    return { json: { link: link, title: title, source_name: source_name, article_text: '', fetch_failed: true } };\n  }\n  let description = '';\n  const metaMatch = html.match(/<meta\\s+name=\"description\"\\s+content=\"([^\"]*)\"/i)\n    || html.match(/<meta\\s+property=\"og:description\"\\s+content=\"([^\"]*)\"/i);\n  if (metaMatch && metaMatch[1]) {\n    description = metaMatch[1]\n      .replace(/&amp;/g, '&').replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\").replace(/&nbsp;/g, ' ');\n  }\n  let ldDescription = '';\n  const ldMatches = html.match(/<script[^>]*type=\"application\\/ld\\+json\"[^>]*>([\\s\\S]*?)<\\/script>/gi) || [];\n  for (const block of ldMatches) {\n    const inner = block.replace(/^[\\s\\S]*?>/, '').replace(/<\\/script>$/i, '');\n    try {\n      const parsed = JSON.parse(inner);\n      const obj = Array.isArray(parsed) ? parsed[0] : parsed;\n      if (obj && obj.description && obj.description.length > ldDescription.length) {\n        ldDescription = obj.description;\n      }\n    } catch (e3) {}\n  }\n  const combined = [description, ldDescription].filter(Boolean).join(' | ');\n  const text = combined || '(no description available)';\n  return { json: { link: link, title: title, source_name: source_name, article_text: text.slice(0, 9000), fetch_failed: false } };\n} catch (outerErr) {\n  return { json: { link: '', title: '', source_name: '', article_text: '', fetch_failed: true, strip_error: String(outerErr && outerErr.message || outerErr) } };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4016,
+        320
+      ],
+      "id": "w2n-stripytwatch",
+      "name": "Strip YouTube Page to Text",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "courses",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2672,
+        992
+      ],
+      "id": "w2n-fetchexisting",
+      "name": "Fetch Existing Course Names",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const combined = $('Combine All Courses').first().json;\nconst existingRows = $input.all().map(function(i) { return i.json; });\nconst existingNames = new Set(\n  existingRows.map(function(r) { return (r.name || '').toLowerCase().trim(); }).filter(Boolean)\n);\nconst allCourses = combined.courses || [];\nconst filteredCourses = allCourses.filter(function(c) {\n  const key = (c.normalized_name || c.course_name || '').toLowerCase().trim();\n  return !existingNames.has(key);\n});\nreturn [{ json: {\n  captured_date: combined.captured_date,\n  total_courses: filteredCourses.length,\n  source_count: combined.source_count,\n  courses: filteredCourses,\n  skipped_existing_count: allCourses.length - filteredCourses.length\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2896,
+        992
+      ],
+      "id": "w2n-filterexisting",
+      "name": "Filter Out Already-Known Courses",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Loop Sources (SplitInBatches)').item.json.source_type }}",
+              "rightValue": "google_search",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "gs-check-1"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3344,
+        512
+      ],
+      "id": "w2n-isgsearch",
+      "name": "Is Google Search Source?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\nconst results = (body.organic_results || []).slice(0, 3);\nif (!results.length) return [];\nreturn results.map(function(r) {\n  return { json: { link: r.link || '', title: r.title || '', source_name: (r.source || r.displayed_link || 'Google Search') } };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3568,
+        704
+      ],
+      "id": "w2n-pickgsearch3",
+      "name": "Pick Top 3 Google Search Results",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.link }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3792,
+        704
+      ],
+      "id": "w2n-fetchgsearch",
+      "name": "Fetch Search Result HTML",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function stripBoilerplateTags(fragment) {\n  return fragment\n    .replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<nav[\\s\\S]*?<\\/nav>/gi, '')\n    .replace(/<header[\\s\\S]*?<\\/header>/gi, '')\n    .replace(/<footer[\\s\\S]*?<\\/footer>/gi, '')\n    .replace(/<aside[\\s\\S]*?<\\/aside>/gi, '')\n    .replace(/<form[\\s\\S]*?<\\/form>/gi, '')\n    .replace(/<svg[\\s\\S]*?<\\/svg>/gi, '')\n    .replace(/<noscript[\\s\\S]*?<\\/noscript>/gi, '')\n    .replace(/<iframe[\\s\\S]*?<\\/iframe>/gi, '')\n    .replace(/<!--[\\s\\S]*?-->/g, '');\n}\n\nfunction tagsToText(fragment) {\n  return fragment\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\")\n    .replace(/\\s+/g, ' ').trim();\n}\n\nfunction extractArticleText(html) {\n  const noHead = html.replace(/<head[\\s\\S]*?<\\/head>/i, '');\n  const cleaned = stripBoilerplateTags(noHead);\n\n  const CONTENT_PATTERNS = [\n    /<article[^>]*>([\\s\\S]*?)<\\/article>/i,\n    /<main[^>]*>([\\s\\S]*?)<\\/main>/i,\n    /<div[^>]*class=\"[^\"]*(?:articleBody|story-body|post-content|entry-content|article-content|article-body|content-body)[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i,\n    /<div[^>]*(?:role|itemprop)=\"(?:main|articleBody)\"[^>]*>([\\s\\S]*?)<\\/div>/i\n  ];\n\n  for (const pattern of CONTENT_PATTERNS) {\n    const m = cleaned.match(pattern);\n    if (m && m[1]) {\n      const text = tagsToText(m[1]);\n      if (text.length > 200) return text;\n    }\n  }\n\n  const bodyMatch = cleaned.match(/<body[^>]*>([\\s\\S]*?)<\\/body>/i);\n  const scope = bodyMatch && bodyMatch[1] ? bodyMatch[1] : cleaned;\n  return tagsToText(scope);\n}\n\ntry {\n  const raw = $json.data || $json.body || $json;\n  const html = typeof raw === 'string' ? raw : JSON.stringify(raw);\n  const isFetchError = !html || html.length < 50 || $json.error;\n  let link = '', title = '', source_name = '';\n  try {\n    const src = $('Pick Top 3 Google Search Results').item.json;\n    link = src.link || ''; title = src.title || ''; source_name = src.source_name || '';\n  } catch (e2) {}\n  if (isFetchError) {\n    return { json: { link: link, title: title, source_name: source_name, article_text: '', fetch_failed: true } };\n  }\n  const text = extractArticleText(html);\n  return { json: { link: link, title: title, source_name: source_name, article_text: text.slice(0, 9000), fetch_failed: false } };\n} catch (outerErr) {\n  return { json: { link: '', title: '', source_name: '', article_text: '', fetch_failed: true, strip_error: String(outerErr && outerErr.message || outerErr) } };\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4016,
+        704
+      ],
+      "id": "w2n-stripgsearch",
+      "name": "Strip Search Result to Text",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(function(i) { return i.json; }).filter(function(it) { return !it.fetch_failed && it.article_text; });\nif (!items.length) {\n  return [{ json: { prompt_text: '', article_count: 0 } }];\n}\nconst blocks = items.map(function(it, idx) {\n  return 'RESULT ' + (idx + 1) + ' (source: ' + (it.source_name || 'unknown') + ', title: \"' + it.title + '\"):\\n' + it.article_text;\n});\nreturn [{ json: { prompt_text: blocks.join('\\n\\n---\\n\\n'), article_count: items.length } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4240,
+        704
+      ],
+      "id": "w2n-combinegsearch",
+      "name": "Combine Search Result Texts",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.1-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.1-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ \"You are extracting real Indian graduate/degree course names mentioned in the following web article text (from Google Search results about trending graduate courses). Only extract full course/degree names actually named in this text - e.g. B.Tech, B.Sc, BBA, MBA, B.Com, BCA, Diploma in X, Bachelor of X. Ignore exam names, salary figures, unrelated career-advice fluff, and university/college names alone (a college name without a course name attached is not a course). If the article text is empty or contains no real course names, return an empty array.\\n\\nReturn ONLY a JSON array of strings, nothing else, no markdown fences. Example: [\\\"B.Tech Computer Science\\\", \\\"B.Sc Data Science\\\"]\\n\\nARTICLE TEXT:\\n\" + $json.prompt_text }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        4464,
+        704
+      ],
+      "id": "w2n-extractgsearchai",
+      "name": "Extract Courses from Google Search (AI)",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "sanjgJOPV62e0Vul",
+          "name": "n8n"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const HEADLINE_PATTERNS = [\n  /\\blakh\\b/i, /\\bcrore\\b/i, /\\bresult(s)?\\b/i, /\\btoday\\b/i, /\\byesterday\\b/i,\n  /\\bapply now\\b/i, /\\badmission[s]?\\s+open/i, /\\bregistration/i, /\\bnotification/i,\n  /\\bexam\\s+date/i, /\\bscore\\s?card/i, /\\bmerit\\s+list/i, /\\bcut\\s?off/i,\n  /[;?!]/, /\\bwhat\\s+after\\b/i, /\\bhow\\s+to\\b/i, /\\bnews\\b/i,\n  /\\d{4}-\\d{2}-\\d{2}/, /\\bdeclared\\b/i, /\\breleased\\b/i\n];\nfunction looksLikeHeadline(name) { return HEADLINE_PATTERNS.some(function(p) { return p.test(name); }); }\n\nfunction extractArrayText(resp) {\n  try {\n    const candidate = (resp.candidates && resp.candidates[0]) || null;\n    if (!candidate) return '';\n    const parts = (candidate.content && candidate.content.parts) || [];\n    const texts = parts.map(function(p) { return p.text || ''; }).filter(Boolean);\n    return texts.join('\\n');\n  } catch (e) { return ''; }\n}\n\nlet items = [];\ntry {\n  const resp = $input.first().json;\n  const text = extractArrayText(resp);\n  const fb = text.indexOf('[');\n  const lb = text.lastIndexOf(']');\n  const jsonSlice = (fb !== -1 && lb !== -1 && lb > fb) ? text.slice(fb, lb + 1) : '[]';\n  const names = JSON.parse(jsonSlice);\n  const seen = new Set();\n  (Array.isArray(names) ? names : []).forEach(function(raw) {\n    if (!raw) return;\n    const name = String(raw).trim();\n    if (name.length < 2 || name.length > 100) return;\n    if (looksLikeHeadline(name)) return;\n    const norm = name.toLowerCase();\n    if (seen.has(norm)) return;\n    seen.add(norm);\n    items.push({\n      course_name: name,\n      normalized_name: norm,\n      source_type: 'google_search',\n      search_volume: 0,\n      popularity_score: 1,\n      hiring_demand: 0,\n      mentions: 1,\n      discussion_count: 0,\n      growth_pct: 0,\n      raw: { method: 'ai_article_extract' }\n    });\n  });\n} catch (e) {\n  items = [];\n}\n\nif (items.length === 0) {\n  return [{ json: { source_type: 'google_search', empty: true } }];\n}\nreturn [{ json: { source_type: 'google_search', item_count: items.length, items: items } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4816,
+        704
+      ],
+      "id": "w2n-parsegsearchlist",
+      "name": "Parse AI Google Search Course List",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "When Called by Master Scheduler": {
+      "main": [
+        [
+          {
+            "node": "Log Run Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Run Start": {
+      "main": [
+        [
+          {
+            "node": "Build Source Config List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Source Config List": {
+      "main": [
+        [
+          {
+            "node": "Loop Sources (SplitInBatches)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Sources (SplitInBatches)": {
+      "main": [
+        [
+          {
+            "node": "Combine All Courses",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route by Fetch Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Source API": {
+      "main": [
+        [
+          {
+            "node": "Is Google News Source?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Error Handler (Fetch Failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize to Common Shape": {
+      "main": [
+        [
+          {
+            "node": "Normalize OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize OK?": {
+      "main": [
+        [
+          {
+            "node": "Next Source",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Error Handler (Normalize Failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Error Handler (Fetch Failed)": {
+      "main": [
+        [
+          {
+            "node": "Next Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Error Handler (Normalize Failed)": {
+      "main": [
+        [
+          {
+            "node": "Next Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Source": {
+      "main": [
+        [
+          {
+            "node": "Loop Sources (SplitInBatches)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine All Courses": {
+      "main": [
+        [
+          {
+            "node": "Fetch Existing Course Names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to trend_history": {
+      "main": [
+        [
+          {
+            "node": "Mark Run Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Run Complete": {
+      "main": [
+        [
+          {
+            "node": "Execute: Trend Ranking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Fetch Mode": {
+      "main": [
+        [
+          {
+            "node": "Call Source API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Scrape Proxy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Scrape Proxy": {
+      "main": [
+        [
+          {
+            "node": "Normalize to Common Shape",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Error Handler (Fetch Failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Google News Source?": {
+      "main": [
+        [
+          {
+            "node": "Pick Top 3 News Articles",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is YouTube Source?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Top 3 News Articles": {
+      "main": [
+        [
+          {
+            "node": "Fetch Article HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Article HTML": {
+      "main": [
+        [
+          {
+            "node": "Strip HTML to Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strip HTML to Text": {
+      "main": [
+        [
+          {
+            "node": "Combine Article Texts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Article Texts": {
+      "main": [
+        [
+          {
+            "node": "Extract Courses from News (AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Courses from News (AI)": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Course List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Course List": {
+      "main": [
+        [
+          {
+            "node": "Normalize OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is YouTube Source?": {
+      "main": [
+        [
+          {
+            "node": "Pick Top 3 YouTube Videos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Google Search Source?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Top 3 YouTube Videos": {
+      "main": [
+        [
+          {
+            "node": "Fetch YouTube Watch Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine YouTube Texts": {
+      "main": [
+        [
+          {
+            "node": "Extract Courses from YouTube (AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Courses from YouTube (AI)": {
+      "main": [
+        [
+          {
+            "node": "Parse AI YouTube Course List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI YouTube Course List": {
+      "main": [
+        [
+          {
+            "node": "Normalize OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch YouTube Watch Page": {
+      "main": [
+        [
+          {
+            "node": "Strip YouTube Page to Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strip YouTube Page to Text": {
+      "main": [
+        [
+          {
+            "node": "Combine YouTube Texts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Existing Course Names": {
+      "main": [
+        [
+          {
+            "node": "Filter Out Already-Known Courses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Out Already-Known Courses": {
+      "main": [
+        [
+          {
+            "node": "Save to trend_history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Google Search Source?": {
+      "main": [
+        [
+          {
+            "node": "Pick Top 3 Google Search Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize to Common Shape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Top 3 Google Search Results": {
+      "main": [
+        [
+          {
+            "node": "Fetch Search Result HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Search Result HTML": {
+      "main": [
+        [
+          {
+            "node": "Strip Search Result to Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strip Search Result to Text": {
+      "main": [
+        [
+          {
+            "node": "Combine Search Result Texts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Search Result Texts": {
+      "main": [
+        [
+          {
+            "node": "Extract Courses from Google Search (AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Courses from Google Search (AI)": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Google Search Course List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Google Search Course List": {
+      "main": [
+        [
+          {
+            "node": "Normalize OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  }
+}

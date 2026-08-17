@@ -1,0 +1,1177 @@
+{
+  "name": "08_-_HeyGen_Video",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "course_id",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        320
+      ],
+      "id": "e1179430-e0f7-4fa3-8b32-1346e1c4d8a7",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/courses?select=*,salaries(*),colleges(*),careers(*),faq(*),news(*)&id=eq.{{ $json.course_id }}&review_status=eq.verified",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w8n-fetchcourse",
+      "name": "Fetch Course",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        320
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const course = $input.first().json;\n\nif (!course.id) {\n  throw new Error(\n    'Verified course not found for id: ' +\n    $('When Executed by Another Workflow').item.json.course_id\n  );\n}\n\nconst salary = course.salaries || {};\n\nconst govColleges = (course.colleges || [])\n  .filter(c => c.type === 'government')\n  .slice(0, 3)\n  .map(c => c.name);\n\nconst privColleges = (course.colleges || [])\n  .filter(c => c.type === 'private')\n  .slice(0, 3)\n  .map(c => c.name);\n\nconst recruiters = (course.careers || [])\n  .slice(0, 5)\n  .map(c => c.role);\n\nconst faqTop2 = (course.faq || [])\n  .slice(0, 2)\n  .map(f => f.question + ' -> ' + f.answer)\n  .join(' | ');\n\nconst latestNews = (course.news || [])\n  .slice()\n  .sort((a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0))[0];\n\nreturn [{\n  json: {\n    course_id: course.id,\n    course_name: course.name,\n    description: course.description,\n    eligibility: course.eligibility,\n    duration: course.duration,\n    entrance_exams: (course.entrance_exams || []).join(', '),\n    career_path: course.career_path,\n    future_scope: course.future_scope,\n    emerging_trends: course.emerging_trends,\n    abroad_opportunities: course.abroad_opportunities,\n    scholarships: course.scholarships,\n    industry_demand: course.industry_demand,\n    average_salary: salary.average_salary || 'N/A',\n    highest_salary: salary.highest_salary || 'N/A',\n    placement_percent: salary.placement_percent || 'N/A',\n    government_colleges_top3: govColleges.join(', '),\n    private_colleges_top3: privColleges.join(', '),\n    recruiters_top5: recruiters.join(', '),\n    faq_summary: faqTop2,\n    latest_news_summary: latestNews ? (latestNews.headline + ' - ' + latestNews.summary) : ''\n  }\n}];"
+      },
+      "id": "w8n-flattencourse",
+      "name": "Flatten Course",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        320
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/prompt_templates?select=template_body&template_key=eq.heygen_video_agent_system&is_active=eq.true&order=version.desc&limit=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w8n-fetchsystemplate",
+      "name": "Fetch Active System Prompt Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        656,
+        320
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.video_prompt || '').length }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "id": "d855b768-bd1a-48a9-964a-06164ddcbfab"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "w8n-payloadok",
+      "name": "Payload OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/video_assets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { course_id: $json.course_id, thumbnail_prompt: $json.youtube_thumbnail_prompt, status: 'queued' } }}",
+        "options": {}
+      },
+      "id": "w8n-insertvideoasset",
+      "name": "Insert video_assets (queued)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1904,
+        128
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.first().json;\nconst row = Array.isArray(rows) ? rows[0] : rows;\nconst ctx = $('Parse Agent Output').item.json;\nreturn [{ json: { ...ctx, video_asset_id: row.id } }];\n"
+      },
+      "id": "w8n-flatteninsertva",
+      "name": "Flatten video_assets Insert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2144,
+        128
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v3/video-agents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { prompt: $json.video_prompt, avatar_id: $json.avatar_look_id, files: [ { type: \"asset_id\", asset_id: \"37a09f9dcf7245ffb27399ecedb0fb25\" }, { type: \"asset_id\", asset_id: \"eae674e9c1c5468b9ca300e6a4e5b8ee\" } ] } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "w8n-postheygen",
+      "name": "POST HeyGen /v3/video-agents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3472,
+        16
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ds8nYq7AjQ0Csv4w",
+          "name": "hey gen -sugg"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/video_assets?id=eq.{{ $('Flatten video_assets Insert').item.json.video_asset_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { heygen_video_id: $json.data.video_id, status: 'generating' } }}",
+        "options": {}
+      },
+      "id": "w8n-storevideoid",
+      "name": "Store heygen_video_id (generating)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3696,
+        -80
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 90
+      },
+      "id": "016eb6c7-aae1-4422-9261-36b080a982c0",
+      "name": "Wait 90s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3920,
+        -80
+      ],
+      "webhookId": "968f7cae-fa90-4158-90d5-03175f19f313"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.heygen.com/v3/videos/{{ $('POST HeyGen /v3/video-agents').item.json.data.video_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "005d5c57-8cc3-45e0-a4db-9b5d8c8e32a8",
+      "name": "GET HeyGen /v3/videos/{id}",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4144,
+        -160
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ds8nYq7AjQ0Csv4w",
+          "name": "hey gen -sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/video_assets?heygen_video_id=eq.{{ $('POST HeyGen /v3/video-agents').item.json.data.video_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { status: 'ready', video_url: $json.data.video_url, duration_seconds: $json.data.duration } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4592,
+        -304
+      ],
+      "id": "02f101bd-75eb-45f0-af39-f24507b7fb1c",
+      "name": "Mark video_assets Ready",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/video_assets?heygen_video_id=eq.{{ $('POST HeyGen /v3/video-agents').item.json.data.video_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { status: 'failed', error_message: ($json.data && $json.data.error && $json.data.error.message) || 'HeyGen reported render failure' } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4816,
+        -112
+      ],
+      "id": "9e868667-6174-4515-9340-862294273c30",
+      "name": "Mark video_assets Failed",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "id": "e7e62ba3-2bbd-40ec-a21b-131ea64a485f",
+      "name": "Still Processing - Wait Again",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4816,
+        112
+      ],
+      "webhookId": "7d70629b-c8e1-4312-b568-ee2092dac565"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "D46SUmWUtLZnTbYp",
+          "cachedResultName": "00_Shared_Error_Handler_Sub-Workflow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflowName": "HeyGen Video",
+            "nodeName": "Mark video_assets Failed / Poll Timeout",
+            "payload": "={{ $json }}",
+            "errorMessage": "={{ $json.data?.error?.message || 'Render failed or exceeded max polls' }}",
+            "retryCount": 0,
+            "executionId": "={{ $execution.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "c5319feb-0a04-47a2-98e0-316bd0adf47b",
+      "name": "Call Error Handler (Render Failed)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        5040,
+        -112
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "D46SUmWUtLZnTbYp",
+          "cachedResultName": "00_Shared_Error_Handler_Sub-Workflow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflowName": "HeyGen Video",
+            "nodeName": "POST HeyGen /v2/video/generate",
+            "payload": "={{ $json }}",
+            "errorMessage": "={{ $json.error?.message || 'HeyGen generate API call failed' }}",
+            "retryCount": 0,
+            "executionId": "={{ $execution.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "7bfe32f2-28e9-4c60-a337-8fa4534bfc64",
+      "name": "Call Error Handler (Generate API Failed)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3696,
+        112
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "D46SUmWUtLZnTbYp",
+          "cachedResultName": "00_Shared_Error_Handler_Sub-Workflow"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "workflowName": "HeyGen Video",
+            "nodeName": "Parse Agent Output",
+            "payload": "={{ $json }}",
+            "errorMessage": "={{ $json.message || 'Payload build/validation failed' }}",
+            "retryCount": 0,
+            "executionId": "={{ $execution.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "43222dc1-7109-4a88-b492-b1babe70c76c",
+      "name": "Call Error Handler (Payload Build Failed)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1904,
+        320
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const c = $('Flatten Course').item.json;\nconst NL = String.fromCharCode(10);\nconst lines = [\n  'COURSE: ' + c.course_name,\n  'Description: ' + c.description,\n  'Eligibility: ' + c.eligibility,\n  'Duration: ' + c.duration,\n  'Entrance exams: ' + c.entrance_exams,\n  'Average salary: Rs ' + c.average_salary + ' per year',\n  'Highest salary: Rs ' + c.highest_salary + ' per year',\n  'Placement rate: ' + c.placement_percent + '%',\n  'Top recruiters: ' + c.recruiters_top5,\n  'Career paths: ' + c.career_path,\n  'Top government colleges: ' + c.government_colleges_top3,\n  'Top private colleges: ' + c.private_colleges_top3,\n  'Industry demand: ' + c.industry_demand,\n  'Future scope: ' + c.future_scope,\n  'Emerging trends: ' + c.emerging_trends,\n  'Abroad opportunities: ' + c.abroad_opportunities,\n  'Scholarships available: ' + c.scholarships,\n  'FAQ context: ' + c.faq_summary,\n  'Latest news context: ' + c.latest_news_summary\n];\nreturn [{ json: Object.assign({}, c, { user_message: lines.join(NL) }) }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        320
+      ],
+      "id": "w8n-buildusermsg",
+      "name": "Build Agent User Message",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        544
+      ],
+      "id": "w8n-geminimodel1",
+      "name": "Google Gemini Chat Model",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BM52vHe9rRcBkQE4",
+          "name": "SUGG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.6-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1248,
+        544
+      ],
+      "id": "w8n-geminimodel2",
+      "name": "Google Gemini Chat Model1",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BM52vHe9rRcBkQE4",
+          "name": "SUGG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.user_message }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "={{ $('Fetch Active System Prompt Template').item.json.template_body }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1104,
+        320
+      ],
+      "id": "w8n-aiagent",
+      "name": "AI Agent",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.output;\nconst cleaned = String(raw || '').replace(/```json|```/g, '').trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = {};\n  if (/^generate this/i.test(cleaned)) {\n    parsed.video_prompt = cleaned;\n  } else {\n    parsed._raw_unparsed = cleaned;\n  }\n}\n\nconst ctx = $('Build Agent User Message').first().json;\n\n['video_prompt', 'youtube_thumbnail_prompt'].forEach(function(f) {\n  if (typeof parsed[f] === 'string') parsed[f] = parsed[f].replace(/[\\u2014\\u2013]/g, ', ');\n});\n\nif (!parsed.video_prompt || parsed.video_prompt.length < 200) {\n  parsed.video_prompt = 'Generate this in a single pass with one continuous take per scene. Do not create multiple alternate versions of the whole video. Format the output as a 9:16 vertical video suitable for Instagram Reels and YouTube Shorts. The presenter should remain warm and composed, speaking clear Indian English at a comfortable pace, with natural but not excessive hand gestures. To start, ' + ctx.course_name + ' offers strong outcomes: average salary Rs ' + ctx.average_salary + ' per year with placement rate ' + ctx.placement_percent + '%. Many students are unsure if this course is worth pursuing. This course opens paths into ' + ctx.career_path + '. Top recruiters include ' + ctx.recruiters_top5 + '. To close, aspiring students should prepare for ' + ctx.entrance_exams + ' and follow this channel for the next course guide. After the presenter finishes speaking, cut to a final closing scene of 4 to 5 seconds on a clean white background showing the Sugg logo centered above the attached QR code, with the QR code fully visible below it. Keep both the logo and QR code fully visible and completely static for the entire closing scene. Do not fade, redraw, crop, distort, animate, or replace the logo or QR code at any point. Aim for a total video length close to 50 seconds, not exceeding 50 seconds. This is the final creative direction for this single video.';\n}\n\nif (!parsed.youtube_thumbnail_prompt) {\n  parsed.youtube_thumbnail_prompt = 'A confident Indian professional in formal attire stands in a bright modern setting relevant to a career in ' + ctx.course_name + ', looking directly at the camera with a warm, trustworthy expression. Clean corporate background, 16:9 composition, professional photography style, sharp focus, no text or logos in the image.';\n}\n\nfunction wc(s) { return String(s || '').trim().split(/\\s+/).filter(Boolean).length; }\n\nconst reel = parsed.instagram_reel || {};\nconst reelOrder = ['hook', 'problem', 'opportunity', 'evidence', 'cta'];\nlet reelWords = [];\nreelOrder.forEach(function(k) { reelWords = reelWords.concat(String(reel[k] || '').split(/\\s+/).filter(Boolean)); });\nif (reelWords.length > 90) { reelWords = reelWords.slice(0, 90); }\nconst reelBody = reelWords.join(' ');\n\nconst yt = parsed.youtube_shorts || {};\nconst li = parsed.linkedin_post || {};\nconst fb = parsed.facebook_post || {};\n\nconst contentRows = [\n  { course_id: ctx.course_id, platform: 'instagram_reel', title: null, body: reelBody, hashtags: [], metadata: {}, script_json: reel, status: 'draft', word_count: wc(reelBody) },\n  { course_id: ctx.course_id, platform: 'youtube_shorts', title: yt.title || null, body: yt.body || '', hashtags: [], metadata: {}, script_json: null, status: 'draft', word_count: wc(yt.body) },\n  { course_id: ctx.course_id, platform: 'linkedin_post', title: null, body: li.body || '', hashtags: li.hashtags || [], metadata: {}, script_json: null, status: 'draft', word_count: wc(li.body) },\n  { course_id: ctx.course_id, platform: 'facebook_post', title: null, body: fb.body || '', hashtags: fb.hashtags || [], metadata: {}, script_json: null, status: 'draft', word_count: wc(fb.body) }\n];\n\nreturn [{\n  json: {\n    course_id: ctx.course_id,\n    course_name: ctx.course_name,\n    video_prompt: parsed.video_prompt,\n    youtube_thumbnail_prompt: parsed.youtube_thumbnail_prompt,\n    content_rows: contentRows\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        320
+      ],
+      "id": "w8n-parseagentoutput",
+      "name": "Parse Agent Output",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.heygen.com/v3/avatars",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { type: \"prompt\", name: \"SUG Daily Look - \" + $now.toISO(), prompt: \"Realistic professional portrait of the exact same woman as the reference image - preserve her exact facial identity, structure, skin tone, eyes, features. Do not alter her face.\\n\\nApproachable, confident, warm, professional career mentor look - authentic, not glamorous or AI-looking.\\n\\nFormal Indian saree: new design, color, fabric, blouse, border, drape never used before. Neat, modest, realistic pleats. Pick a sophisticated new saree color yourself each time, not bridal. Minimal jewelry: small earrings, delicate chain, simple bangles.\\n\\nNew workplace background never used before: modern office, creative workspace, or career-coaching studio, warm lighting, secondary to her.\\n\\nFace camera, relaxed expression. Photoreal: natural skin, realistic saree fabric, realistic hands, natural lighting, shallow depth of field.\\n\\nRules: same face always. Never reuse saree color, design, fabric, border, or drape. New background every time. No bridal styling, no excess jewelry, no artificial smoothing.\", avatar_id: \"fc0bce8708c041209e500c36aeafb4ef\" } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2576,
+        128
+      ],
+      "id": "w8n-generatedailylook",
+      "name": "Generate Daily Look",
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ds8nYq7AjQ0Csv4w",
+          "name": "hey gen -sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4368,
+        -160
+      ],
+      "id": "w8n-iscompleted",
+      "name": "Is Completed?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "failed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4592,
+        -64
+      ],
+      "id": "w8n-isfailed",
+      "name": "Is Failed?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "processing",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "id": "c6ef3ca5-a350-42d0-8433-3a337c502905"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3024,
+        64
+      ],
+      "id": "w8n-islookready",
+      "name": "Is Look Ready?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\nconst ctx = $('Flatten video_assets Insert').item.json;\nconst lookId = (j.data && j.data.id) || $('Generate Daily Look').item.json.data.avatar_item.id || 'fc0bce8708c041209e500c36aeafb4ef';\nreturn [{ json: { ...ctx, avatar_look_id: lookId } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3248,
+        16
+      ],
+      "id": "w8n-finalizelookid",
+      "name": "Finalize Look ID",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3248,
+        224
+      ],
+      "id": "w8n-waitlook20s",
+      "name": "Wait Look 20s",
+      "webhookId": "w8n-waitlook20s-hook"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.heygen.com/v3/avatars/looks/{{ $('Generate Daily Look').item.json.data.avatar_item.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2800,
+        128
+      ],
+      "id": "w8n-getlooks",
+      "name": "GET Avatar Group Looks",
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ds8nYq7AjQ0Csv4w",
+          "name": "hey gen -sugg"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/content_items",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.content_rows }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1904,
+        512
+      ],
+      "id": "w8n-insertcontentitems",
+      "name": "Insert content_items",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        2128,
+        512
+      ],
+      "id": "a57461ee-6f73-42ba-8557-7958bcc65ead",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "fax6LABh67qyY4u7",
+          "cachedResultName": "09_-_Social_Publisher"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "course_id": "={{ $('Flatten Course').item.json.course_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "course_id",
+              "displayName": "course_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4816,
+        -304
+      ],
+      "id": "b33d24b3-dd4d-4ffe-80d3-d98cf72fffb8",
+      "name": "Execute: Social Publisher",
+      "retryOnFail": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Fetch Course",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Course": {
+      "main": [
+        [
+          {
+            "node": "Flatten Course",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Course": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active System Prompt Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active System Prompt Template": {
+      "main": [
+        [
+          {
+            "node": "Build Agent User Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payload OK?": {
+      "main": [
+        [
+          {
+            "node": "Insert video_assets (queued)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Insert content_items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Error Handler (Payload Build Failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert video_assets (queued)": {
+      "main": [
+        [
+          {
+            "node": "Flatten video_assets Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten video_assets Insert": {
+      "main": [
+        [
+          {
+            "node": "Generate Daily Look",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST HeyGen /v3/video-agents": {
+      "main": [
+        [
+          {
+            "node": "Store heygen_video_id (generating)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Error Handler (Generate API Failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store heygen_video_id (generating)": {
+      "main": [
+        [
+          {
+            "node": "Wait 90s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 90s": {
+      "main": [
+        [
+          {
+            "node": "GET HeyGen /v3/videos/{id}",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET HeyGen /v3/videos/{id}": {
+      "main": [
+        [
+          {
+            "node": "Is Completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark video_assets Failed": {
+      "main": [
+        [
+          {
+            "node": "Call Error Handler (Render Failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Processing - Wait Again": {
+      "main": [
+        [
+          {
+            "node": "Wait 90s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Agent User Message": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse Agent Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Agent Output": {
+      "main": [
+        [
+          {
+            "node": "Payload OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Daily Look": {
+      "main": [
+        [
+          {
+            "node": "GET Avatar Group Looks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Completed?": {
+      "main": [
+        [
+          {
+            "node": "Mark video_assets Ready",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Failed?": {
+      "main": [
+        [
+          {
+            "node": "Mark video_assets Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Still Processing - Wait Again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark video_assets Ready": {
+      "main": [
+        [
+          {
+            "node": "Execute: Social Publisher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Look Ready?": {
+      "main": [
+        [
+          {
+            "node": "Finalize Look ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Look 20s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalize Look ID": {
+      "main": [
+        [
+          {
+            "node": "POST HeyGen /v3/video-agents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Look 20s": {
+      "main": [
+        [
+          {
+            "node": "GET Avatar Group Looks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET Avatar Group Looks": {
+      "main": [
+        [
+          {
+            "node": "Is Look Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert content_items": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "59a050c1-2f9d-4033-8be4-e4174458a6ab",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f59fd08d81badd07cb9450cc12cd05722e59eba1c557ed5cd34a2ae43b2d5fe3"
+  },
+  "nodeGroups": [],
+  "id": "a5pMOiPBAYteh45Q",
+  "tags": []
+}

@@ -1,0 +1,199 @@
+[
+  {
+    "file": "00_Shared_Error_Handler_Sub-Workflow (1).json",
+    "name": "00_Shared_Error_Handler_Sub-Workflow",
+    "remapped": [
+      "Send a message: gmailOAuth2 -> Gmail account",
+      "Insert into Dead Letter Queue: supabaseApi -> content_factory",
+      "Mark Workflow Run Failed: supabaseApi -> content_factory"
+    ],
+    "blanked": [
+      "Notify Slack #career-factory-alerts: slackApi (Slack account) left blank"
+    ]
+  },
+  {
+    "file": "01_-_Master_Scheduler (1).json",
+    "name": "01_-_Master_Scheduler",
+    "remapped": [
+      "Log Run Start: supabaseApi -> content_factory",
+      "Mark Run Success: supabaseApi -> content_factory",
+      "Fetch Latest Queue Batch: supabaseApi -> content_factory",
+      "Fetch Next Queued Course: supabaseApi -> content_factory",
+      "Mark Course Consumed: supabaseApi -> content_factory"
+    ],
+    "blanked": [
+      "Notify Slack: Queue Empty: slackApi (Slack account) left blank"
+    ]
+  },
+  {
+    "file": "02_-_Trend_Discovery (1).json",
+    "name": "02_-_Trend_Discovery",
+    "remapped": [
+      "Log Run Start: supabaseApi -> content_factory",
+      "Save to trend_history: supabaseApi -> content_factory",
+      "Mark Run Complete: supabaseApi -> content_factory",
+      "Extract Courses from News (AI): googlePalmApi -> n8n",
+      "Extract Courses from YouTube (AI): googlePalmApi -> n8n",
+      "Fetch Existing Course Names: supabaseApi -> content_factory",
+      "Extract Courses from Google Search (AI): googlePalmApi -> n8n"
+    ],
+    "blanked": []
+  },
+  {
+    "file": "03_-_Trend_Ranking.json",
+    "name": "03_-_Trend_Ranking",
+    "remapped": [
+      "Fetch Today's Trend Row: supabaseApi -> content_factory",
+      "Write trend_score + rank_position: supabaseApi -> content_factory",
+      "Fetch Recently Covered Courses: supabaseApi -> content_factory",
+      "Insert into content_queue: supabaseApi -> content_factory"
+    ],
+    "blanked": []
+  },
+  {
+    "file": "04_-_Research_Engine.json",
+    "name": "04_-_Research_Engine",
+    "remapped": [
+      "Insert research_raw: supabaseApi -> content_factory",
+      "Research with Google Search (Primary): googlePalmApi -> n8n",
+      "Research with Google Search (Fallback): googlePalmApi -> n8n"
+    ],
+    "blanked": []
+  },
+  {
+    "file": "05_-_Fact_Validation.json",
+    "name": "05_-_Fact_Validation",
+    "remapped": [
+      "Fetch research_raw for Course: supabaseApi -> content_factory",
+      "Ensure courses Row Exists: supabaseApi -> content_factory",
+      "Fetch course_id: supabaseApi -> content_factory",
+      "Upsert course_facts: supabaseApi -> content_factory",
+      "Validate with Google Search (Primary): googlePalmApi -> n8n",
+      "Validate with Google Search (Fallback): googlePalmApi -> n8n"
+    ],
+    "blanked": []
+  },
+  {
+    "file": "06_-_Knowledge_Base_Update.json",
+    "name": "06_-_Knowledge_Base_Update",
+    "remapped": [
+      "Find Facts > 90 Days Old: supabaseApi -> content_factory",
+      "Fetch course_id by Name: supabaseApi -> content_factory",
+      "Fetch Verified course_facts: supabaseApi -> content_factory",
+      "Soft-Delete Old Colleges: supabaseApi -> content_factory",
+      "Insert colleges: supabaseApi -> content_factory",
+      "Upsert salaries: supabaseApi -> content_factory",
+      "Soft-Delete Old FAQ: supabaseApi -> content_factory",
+      "Insert faq: supabaseApi -> content_factory",
+      "Insert into news table: supabaseApi -> content_factory",
+      "Write audit_log: supabaseApi -> content_factory",
+      "Upsert courses (Denormalized): supabaseApi -> content_factory",
+      "Soft-Delete Old Careers: supabaseApi -> content_factory",
+      "Insert careers: supabaseApi -> content_factory"
+    ],
+    "blanked": [
+      "HTTP Request: httpHeaderAuth (Hey gen) left blank"
+    ]
+  },
+  {
+    "file": "07_-_Content_Generation.json",
+    "name": "07_-_Content_Generation",
+    "remapped": [
+      "Fetch Full KB Record: supabaseApi -> content_factory"
+    ],
+    "blanked": []
+  },
+  {
+    "file": "08_-_HeyGen_Video.json",
+    "name": "08_-_HeyGen_Video",
+    "remapped": [
+      "Fetch Course: supabaseApi -> content_factory",
+      "Fetch Active System Prompt Template: supabaseApi -> content_factory",
+      "Insert video_assets (queued): supabaseApi -> content_factory",
+      "Store heygen_video_id (generating): supabaseApi -> content_factory",
+      "Mark video_assets Ready: supabaseApi -> content_factory",
+      "Mark video_assets Failed: supabaseApi -> content_factory",
+      "Google Gemini Chat Model: googlePalmApi -> n8n",
+      "Google Gemini Chat Model1: googlePalmApi -> n8n",
+      "Insert content_items: supabaseApi -> content_factory"
+    ],
+    "blanked": [
+      "POST HeyGen /v3/video-agents: httpHeaderAuth (hey gen -sugg) left blank",
+      "GET HeyGen /v3/videos/{id}: httpHeaderAuth (hey gen -sugg) left blank",
+      "Generate Daily Look: httpHeaderAuth (hey gen -sugg) left blank",
+      "GET Avatar Group Looks: httpHeaderAuth (hey gen -sugg) left blank"
+    ]
+  },
+  {
+    "file": "09_-_Social_Publisher.json",
+    "name": "09_-_Social_Publisher",
+    "remapped": [
+      "Fetch Ready Video for Course: supabaseApi -> content_factory",
+      "Fetch Draft content_items: supabaseApi -> content_factory",
+      "Insert publish_targets: supabaseApi -> content_factory",
+      "Mark content_items Published: supabaseApi -> content_factory",
+      "Generate Thumbnail Image: googlePalmApi -> n8n"
+    ],
+    "blanked": [
+      "Publish: Instagram (Create Container): facebookGraphApi (insta - sugg) left blank",
+      "Publish: Instagram (Get Status): facebookGraphApi (insta - sugg) left blank",
+      "Publish: Instagram (Publish): facebookGraphApi (insta - sugg) left blank",
+      "Publish: Facebook: httpHeaderAuth (fb -sugg) left blank",
+      "Publish: LinkedIn (Register Upload): httpHeaderAuth (linkeidn - sugg) left blank",
+      "Publish: LinkedIn (Upload Bytes): httpHeaderAuth (linkeidn - sugg) left blank",
+      "Publish: LinkedIn (Create Post): httpHeaderAuth (linkeidn - sugg) left blank",
+      "Publish: YouTube (Upload): youTubeOAuth2Api (YouTube account -sugg) left blank",
+      "Upload YouTube Thumbnail: youTubeOAuth2Api (YouTube account -sugg) left blank"
+    ]
+  },
+  {
+    "file": "10_-_Analytics.json",
+    "name": "10_-_Analytics",
+    "remapped": [
+      "Fetch Published publish_targets: supabaseApi -> content_factory",
+      "Upsert analytics (today): supabaseApi -> content_factory",
+      "Fetch Weekly Raw Analytics: supabaseApi -> content_factory"
+    ],
+    "blanked": [
+      "GET Instagram Insights: httpQueryAuth (fb-asses token) left blank",
+      "GET YouTube Analytics: youTubeOAuth2Api (YouTube account -sugg) left blank",
+      "GET LinkedIn Analytics: httpHeaderAuth (linkeidn) left blank",
+      "Slack: Weekly Performance Summary: slackApi (Slack account) left blank",
+      "GET Facebook Video Insights: httpQueryAuth (fb asses token new) left blank",
+      "GET Instagram Insights1: httpQueryAuth (fb-asses token) left blank"
+    ]
+  },
+  {
+    "file": "11_-_AI_Learning_Engine.json",
+    "name": "11_-_AI_Learning_Engine",
+    "remapped": [
+      "Fetch Combined Analytics Data: supabaseApi -> content_factory",
+      "Gemini Finding Primary: googlePalmApi -> n8n",
+      "Gemini Finding Fallback: googlePalmApi -> n8n",
+      "Insert learning_insights: supabaseApi -> content_factory",
+      "Fetch Current Active Template: supabaseApi -> content_factory",
+      "Gemini Rewrite Primary: googlePalmApi -> n8n",
+      "Gemini Rewrite Fallback: googlePalmApi -> n8n",
+      "Deactivate Old Version: supabaseApi -> content_factory",
+      "Insert New Template Version: supabaseApi -> content_factory",
+      "Mark learning_insight Applied: supabaseApi -> content_factory"
+    ],
+    "blanked": [
+      "Slack: Prompt Template Updated: slackApi (Slack account) left blank"
+    ]
+  },
+  {
+    "file": "12_-_Quarterly_Data_Cleanup.json",
+    "name": "12_-_Quarterly_Data_Cleanup",
+    "remapped": [
+      "Purge Soft-Deleted Rows > 180 Days: supabaseApi -> content_factory",
+      "Purge Resolved DLQ > 90 Days: supabaseApi -> content_factory",
+      "Prune trend_history > 1 Year: supabaseApi -> content_factory",
+      "Prune workflow_runs > 1 Year: supabaseApi -> content_factory",
+      "Run ANALYZE Core Tables: supabaseApi -> content_factory"
+    ],
+    "blanked": [
+      "Slack: Cleanup Complete: slackApi (Slack account) left blank"
+    ]
+  }
+]

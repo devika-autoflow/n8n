@@ -1,0 +1,310 @@
+{
+  "name": "12_-_Quarterly_Data_Cleanup",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "013978e5-b95e-4d26-9c28-dd2e88ce52ad",
+      "name": "When Called (Quarterly)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -528,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const tables = [\"courses\", \"course_facts\", \"colleges\", \"careers\", \"salaries\", \"faq\", \"news\", \"content_items\", \"video_assets\", \"publish_targets\", \"analytics\"];\nreturn tables.map(t => ({ json: { table: t } }));"
+      },
+      "id": "w12n-buildpurgelist",
+      "name": "Build Soft-Delete Table List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        -64
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "w12n-looppurge",
+      "name": "Loop Tables",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -80,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/{{ $json.table }}?deleted_at=lt.{{ $now.minus({ days: 180 }).toISO() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w12n-purgetable",
+      "name": "Purge Soft-Deleted Rows > 180 Days",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        144,
+        -160
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "w12n-nexttable",
+      "name": "Next Table",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        368,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/dead_letter_queue?resolved=eq.true&resolved_at=lt.{{ $now.minus({ days: 90 }).toISO() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w12n-purgedlq",
+      "name": "Purge Resolved DLQ > 90 Days",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -304,
+        128
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/trend_history?captured_date=lt.{{ $now.minus({ days: 365 }).toFormat('yyyy-MM-dd') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w12n-prunetrend",
+      "name": "Prune trend_history > 1 Year",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -304,
+        320
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/workflow_runs?started_at=lt.{{ $now.minus({ days: 365 }).toISO() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w12n-pruneruns",
+      "name": "Prune workflow_runs > 1 Year",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -304,
+        512
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/rpc/run_analyze_core_tables",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w12n-runanalyze",
+      "name": "Run ANALYZE Core Tables",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        144,
+        32
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BMCRHJH9U",
+          "mode": "list",
+          "cachedResultName": "career-factory-alerts"
+        },
+        "text": "=white_check_mark: \nQuarterly data cleanup complete — old soft-deleted rows purged, dead letter queue trimmed, trend_history/workflow_runs pruned, core tables re-analyzed.",
+        "otherOptions": {}
+      },
+      "id": "7e5360fd-2bb7-4185-ad75-778652a6e202",
+      "name": "Slack: Cleanup Complete",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        208
+      ],
+      "webhookId": "27a3bd96-f1fb-4dec-a1cd-02bafb162b8b",
+      "retryOnFail": true,
+      "credentials": {
+        "slackApi": {
+          "id": "iPNPr0Rubjo42A0J",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called (Quarterly)": {
+      "main": [
+        [
+          {
+            "node": "Build Soft-Delete Table List",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Purge Resolved DLQ > 90 Days",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prune trend_history > 1 Year",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prune workflow_runs > 1 Year",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Soft-Delete Table List": {
+      "main": [
+        [
+          {
+            "node": "Loop Tables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Tables": {
+      "main": [
+        [
+          {
+            "node": "Run ANALYZE Core Tables",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Purge Soft-Deleted Rows > 180 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Purge Soft-Deleted Rows > 180 Days": {
+      "main": [
+        [
+          {
+            "node": "Next Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Table": {
+      "main": [
+        [
+          {
+            "node": "Loop Tables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run ANALYZE Core Tables": {
+      "main": [
+        [
+          {
+            "node": "Slack: Cleanup Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ef6c8b5d-c255-4b63-9d8b-8a0137844858",
+  "meta": {
+    "instanceId": "f59fd08d81badd07cb9450cc12cd05722e59eba1c557ed5cd34a2ae43b2d5fe3"
+  },
+  "nodeGroups": [],
+  "id": "2GLWTZrjXUl60HWI",
+  "tags": []
+}

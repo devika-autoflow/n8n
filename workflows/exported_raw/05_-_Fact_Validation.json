@@ -1,0 +1,511 @@
+{
+  "name": "05_-_Fact_Validation",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "course_name"
+            }
+          ]
+        }
+      },
+      "id": "a5e5f803-0d07-446b-af86-8a15ac1f1354",
+      "name": "When Called (course_name)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -880,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/research_raw?select=fields,created_at&order=created_at.desc&limit=1&course_name=eq.{{ encodeURIComponent($json.course_name) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w5n-fetchresearch",
+      "name": "Fetch research_raw for Course",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -656,
+        -48
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const courseName = $('When Called (course_name)').item.json.course_name;\nconst slug = courseName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');\nconst rows = $input.all().map(i => i.json);\nconst row = rows[0];\nif (!row || !Array.isArray(row.fields) || row.fields.length === 0) {\n  throw new Error('No research_raw data found for course: ' + courseName + '. Run Research Engine first.');\n}\nreturn [{ json: { course_name: courseName, slug, fields: row.fields } }];\n"
+      },
+      "id": "w5n-buildslug",
+      "name": "Build Course Slug",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        -48
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/courses",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { name: $json.course_name, slug: $json.slug, review_status: 'pending' } }}",
+        "options": {}
+      },
+      "id": "w5n-ensurecourse",
+      "name": "Ensure courses Row Exists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -208,
+        -48
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/courses?select=id&slug=eq.{{ $('Build Course Slug').item.json.slug }}&limit=1",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w5n-fetchcourseid",
+      "name": "Fetch course_id",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        16,
+        -48
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const src = $('Build Course Slug').item.json;\nconst courseIdRows = $input.first().json;\nconst courseId = Array.isArray(courseIdRows) ? courseIdRows[0].id : courseIdRows.id;\n\nconst factsSummary = src.fields.map(f => `- ${f.field_key}: ${JSON.stringify(f.field_value)}`).join('\\n');\n\nconst prompt = `You are an independent fact-checker verifying claims about the Indian graduation course \"${src.course_name}\" using fresh web search.\n\nBelow are researched claims from a prior AI pass. For EACH field, independently search the web and determine if the claim is accurate, especially for numeric fields (salary, placement percentage). Be skeptical — flag anything you cannot verify or that seems wrong.\n\nCLAIMS TO VERIFY:\n${factsSummary}\n\nReturn ONLY valid JSON in this exact shape (no markdown, no commentary):\n{\n  \"field_results\": [\n    { \"field_key\": \"string, must match one of the claim keys above\", \"verified\": true/false, \"confidence\": 0.0-1.0, \"note\": \"short reason\", \"source_urls\": [\"url1\",\"url2\"] }\n  ]\n}\n\nconfidence should reflect how well your independent search agrees with the claim: 1.0 = fully confirmed by multiple sources, 0.5 = partially/uncertain, 0.0 = contradicted or unverifiable.`;\n\nreturn [{ json: { course_name: src.course_name, course_id: courseId, fields: src.fields, prompt } }];\n"
+      },
+      "id": "w5n-buildverifyprompt",
+      "name": "Build Verification Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -48
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst raw = item.output;\nif (!raw) {\n  return [{ json: { error: true, message: 'AI Agent verification returned no output' } }];\n}\nconst cleaned = String(raw).replace(/```json/g, '').replace(/```/g, '').trim();\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  return [{ json: { error: true, message: 'Failed to parse AI Agent verification output: ' + e.message } }];\n}\nreturn [{ json: parsed }];\n"
+      },
+      "id": "w5n-mergeverify",
+      "name": "Merge Verification Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        -48
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const src = $('Build Verification Prompt').item.json;\nconst resp = $input.first().json;\n\nif (resp.error) {\n  throw new Error(resp.message);\n}\n\nconst results = resp.field_results || [];\nconst resultByKey = {};\nresults.forEach(function(r) { resultByKey[r.field_key] = r; });\n\nconst facts = {};\nconst flaggedFields = [];\nlet confidenceSum = 0;\nlet confidenceCount = 0;\n\nsrc.fields.forEach(function(f) {\n  const r = resultByKey[f.field_key] || { confidence: 0.5, verified: false, source_urls: [] };\n  const confidence = typeof r.confidence === 'number' ? r.confidence : 0.5;\n  const reviewStatus = confidence >= 0.8 ? 'verified' : (confidence >= 0.5 ? 'pending' : 'flagged');\n\n  facts[f.field_key] = {\n    value: f.field_value,\n    confidence_score: confidence,\n    review_status: reviewStatus,\n    source_urls: r.source_urls || [],\n    note: r.note || null\n  };\n\n  confidenceSum += confidence;\n  confidenceCount += 1;\n\n  if (confidence < 0.8) {\n    flaggedFields.push({ field_key: f.field_key, value: f.field_value, confidence_score: confidence });\n  }\n});\n\nconst overallConfidence = confidenceCount ? Math.round((confidenceSum / confidenceCount) * 100) / 100 : 0;\n\nreturn [{ json: {\n  course_name: src.course_name,\n  course_id: src.course_id,\n  facts: facts,\n  overall_confidence: overallConfidence,\n  flagged_fields: flaggedFields\n} }];\n"
+      },
+      "id": "w5n-computefacts",
+      "name": "Compute Facts + Confidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        -48
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/course_facts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { course_id: $json.course_id, facts: $json.facts, overall_confidence: $json.overall_confidence, flagged_fields: $json.flagged_fields, last_verified_at: $now.toISO() } }}",
+        "options": {}
+      },
+      "id": "w5n-upsertfacts",
+      "name": "Upsert course_facts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1840,
+        -48
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "39qWGhrL0qYt3L2F",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/39qWGhrL0qYt3L2F"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "course_name": "={{ $('Compute Facts + Confidence').item.json.course_name }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "course_name",
+              "displayName": "course_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "mode",
+              "displayName": "mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "cbe2c39c-209a-4511-8bdb-bc1880ab2575",
+      "name": "Execute: Knowledge Base Update",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2064,
+        -48
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.1-pro-preview",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.1-pro-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "builtInTools": {
+          "googleSearch": true
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        464,
+        -48
+      ],
+      "id": "w5n-validateprimary",
+      "name": "Validate with Google Search (Primary)",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BM52vHe9rRcBkQE4",
+          "name": "SUGG"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "builtInTools": {
+          "googleSearch": true
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        816,
+        32
+      ],
+      "id": "w5n-validatefallback",
+      "name": "Validate with Google Search (Fallback)",
+      "retryOnFail": true,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BM52vHe9rRcBkQE4",
+          "name": "SUGG"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(function(i) { return i.json; });\nconst resp = items[0];\n\nfunction extractText(resp) {\n  const candidate = (resp.candidates && resp.candidates[0]) || null;\n  if (!candidate) return '';\n  const parts = (candidate.content && candidate.content.parts) || [];\n  const texts = parts.map(function(p) { return p.text || ''; }).filter(Boolean);\n  if (!texts.length) return '';\n  const last = texts[texts.length - 1];\n  const firstBrace = last.indexOf('{');\n  const lastBrace = last.lastIndexOf('}');\n  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {\n    return last.slice(firstBrace, lastBrace + 1);\n  }\n  const joined = texts.join('\\n');\n  const fb = joined.indexOf('{');\n  const lb = joined.lastIndexOf('}');\n  if (fb !== -1 && lb !== -1 && lb > fb) return joined.slice(fb, lb + 1);\n  return last;\n}\n\nconst text = extractText(resp);\nreturn [{ json: { output: text } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        -48
+      ],
+      "id": "w5n-mergeverifyraw",
+      "name": "Merge Verification Result Raw",
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {
+    "When Called (course_name)": [
+      {
+        "json": {
+          "course_name": "B.E."
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Called (course_name)": {
+      "main": [
+        [
+          {
+            "node": "Fetch research_raw for Course",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch research_raw for Course": {
+      "main": [
+        [
+          {
+            "node": "Build Course Slug",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Course Slug": {
+      "main": [
+        [
+          {
+            "node": "Ensure courses Row Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure courses Row Exists": {
+      "main": [
+        [
+          {
+            "node": "Fetch course_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch course_id": {
+      "main": [
+        [
+          {
+            "node": "Build Verification Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Verification Prompt": {
+      "main": [
+        [
+          {
+            "node": "Validate with Google Search (Primary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Verification Result": {
+      "main": [
+        [
+          {
+            "node": "Compute Facts + Confidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Facts + Confidence": {
+      "main": [
+        [
+          {
+            "node": "Upsert course_facts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert course_facts": {
+      "main": [
+        [
+          {
+            "node": "Execute: Knowledge Base Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate with Google Search (Primary)": {
+      "main": [
+        [
+          {
+            "node": "Merge Verification Result Raw",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate with Google Search (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate with Google Search (Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Merge Verification Result Raw",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Verification Result Raw": {
+      "main": [
+        [
+          {
+            "node": "Merge Verification Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d9b0141c-a8c4-4e58-a64b-f50b7535c1ec",
+  "meta": {
+    "instanceId": "f59fd08d81badd07cb9450cc12cd05722e59eba1c557ed5cd34a2ae43b2d5fe3"
+  },
+  "nodeGroups": [],
+  "id": "R36zNJvuMpxVOoAr",
+  "tags": []
+}

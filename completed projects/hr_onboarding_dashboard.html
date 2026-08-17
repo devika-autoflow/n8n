@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HR Onboarding Automation Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #080B14;
+    --bg2:     #0E1220;
+    --surface: #1A1F30;
+    --surface2:#222840;
+    --border:  rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.14);
+    --text:    #F0F2FF;
+    --text2:   #9AA0BE;
+    --text3:   #5A6080;
+    --teal:    #00E5B0;
+    --teal2:   #00B88A;
+    --teal3:   rgba(0,229,176,0.12);
+    --blue:    #4D8EFF;
+    --blue2:   rgba(77,142,255,0.12);
+    --violet:  #9B6DFF;
+    --violet2: rgba(155,109,255,0.12);
+    --amber:   #FFB648;
+    --amber2:  rgba(255,182,72,0.12);
+    --coral:   #FF6B6B;
+    --coral2:  rgba(255,107,107,0.12);
+    --green:   #52E07C;
+    --green2:  rgba(82,224,124,0.12);
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 10% 10%, rgba(0,229,176,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 90% 20%, rgba(77,142,255,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 50% 90%, rgba(155,109,255,0.06) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+
+  .page { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 24px 24px 48px; }
+
+  /* ── Header ── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px; gap: 16px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-icon {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, var(--teal), var(--blue));
+    border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; box-shadow: 0 0 24px rgba(0,229,176,0.35); flex-shrink: 0;
+  }
+  .brand-title {
+    font-family: 'Syne', sans-serif; font-size: 19px; font-weight: 700;
+    background: linear-gradient(90deg, #fff 30%, var(--teal));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    letter-spacing: -0.02em;
+  }
+  .brand-sub { font-size: 11px; color: var(--text2); margin-top: 2px; letter-spacing: 0.03em; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(0,229,176,0.1); border: 1px solid rgba(0,229,176,0.2);
+    border-radius: 20px; padding: 5px 14px; font-size: 12px; font-weight: 500; color: var(--teal);
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--teal);
+    box-shadow: 0 0 6px var(--teal); animation: livepulse 2s infinite;
+  }
+  @keyframes livepulse { 0%,100%{opacity:1;}50%{opacity:0.4;} }
+  .status-pill {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 500; border: 1px solid;
+    transition: all 0.3s;
+  }
+  .status-idle { background: rgba(90,96,128,0.15); border-color: rgba(90,96,128,0.3); color: var(--text2); }
+  .status-run  { background: rgba(255,182,72,0.12); border-color: rgba(255,182,72,0.3); color: var(--amber); }
+  .status-done { background: rgba(0,229,176,0.1);  border-color: rgba(0,229,176,0.25); color: var(--teal); }
+  .status-err  { background: rgba(255,107,107,0.1);border-color: rgba(255,107,107,0.25);color:var(--coral);}
+  .sdot { width:6px;height:6px;border-radius:50%;background:currentColor; }
+  .sdot-pulse { animation: sdotpulse 1s infinite; }
+  @keyframes sdotpulse{0%,100%{opacity:1;}50%{opacity:0.25;}}
+
+  /* ── KPI Grid ── */
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 12px; margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 20px; position: relative; overflow: hidden;
+    transition: transform 0.2s, border-color 0.3s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); border-color: var(--border2); }
+  .kpi-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; border-radius: 14px 14px 0 0;
+  }
+  .kpi-card.c-teal::before   { background: linear-gradient(90deg, var(--teal), transparent); }
+  .kpi-card.c-blue::before   { background: linear-gradient(90deg, var(--blue), transparent); }
+  .kpi-card.c-violet::before { background: linear-gradient(90deg, var(--violet), transparent); }
+  .kpi-card.c-amber::before  { background: linear-gradient(90deg, var(--amber), transparent); }
+  .kpi-icon-wrap { width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:12px; }
+  .c-teal   .kpi-icon-wrap { background: var(--teal3); }
+  .c-blue   .kpi-icon-wrap { background: var(--blue2); }
+  .c-violet .kpi-icon-wrap { background: var(--violet2); }
+  .c-amber  .kpi-icon-wrap { background: var(--amber2); }
+  .kpi-label { font-size: 10px; color: var(--text2); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+  .kpi-value { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
+  .c-teal   .kpi-value { color: var(--teal); }
+  .c-blue   .kpi-value { color: var(--blue); }
+  .c-violet .kpi-value { color: var(--violet); }
+  .c-amber  .kpi-value { color: var(--amber); }
+  .kpi-unit { font-size: 15px; font-weight: 400; opacity: 0.7; }
+  .kpi-delta { font-size: 11px; font-weight: 500; }
+  .delta-up  { color: var(--green); }
+  .delta-neu { color: var(--text3); }
+  .delta-down{ color: var(--coral); }
+
+  /* ── Main two-column layout ── */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 16px;
+    align-items: start;
+  }
+
+  /* ── Left column ── */
+  .left-col { display: flex; flex-direction: column; gap: 14px; }
+
+  .charts-row { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 14px; }
+  .charts-row2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 20px; transition: border-color 0.3s;
+  }
+  .chart-card:hover { border-color: var(--border2); }
+  .chart-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+  .chart-title { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600; color: var(--text); }
+  .chart-sub   { font-size: 10px; color: var(--text3); margin-top: 2px; }
+  .badge { font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 20px; letter-spacing: 0.04em; white-space: nowrap; }
+  .badge-teal   { background: var(--teal3);   color: var(--teal);   border: 1px solid rgba(0,229,176,0.2); }
+  .badge-blue   { background: var(--blue2);   color: var(--blue);   border: 1px solid rgba(77,142,255,0.2); }
+  .badge-violet { background: var(--violet2); color: var(--violet); border: 1px solid rgba(155,109,255,0.2); }
+  .badge-amber  { background: var(--amber2);  color: var(--amber);  border: 1px solid rgba(255,182,72,0.2); }
+
+  /* ── Activity feed ── */
+  .activity-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+  .activity-list { list-style: none; }
+  .activity-item {
+    display: flex; align-items: flex-start; gap: 11px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    animation: fadeIn 0.4s ease;
+  }
+  .activity-item:last-child { border-bottom: none; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;} }
+  .act-avatar { width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0; }
+  .av-green  { background:var(--green2);  color:var(--green); }
+  .av-blue   { background:var(--blue2);   color:var(--blue); }
+  .av-amber  { background:var(--amber2);  color:var(--amber); }
+  .av-coral  { background:var(--coral2);  color:var(--coral); }
+  .av-violet { background:var(--violet2); color:var(--violet); }
+  .act-body  { flex:1;min-width:0; }
+  .act-name  { font-size:12px;font-weight:500;color:var(--text); }
+  .act-detail{ font-size:11px;color:var(--text2);margin-top:2px;line-height:1.4; }
+  .act-time  { font-size:10px;color:var(--text3);margin-top:3px; }
+  .act-tag   { font-size:10px;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0;align-self:flex-start;margin-top:2px;font-weight:500; }
+  .tag-done  { background:var(--green2);  color:var(--green); }
+  .tag-prog  { background:var(--blue2);   color:var(--blue); }
+  .tag-err   { background:var(--coral2);  color:var(--coral); }
+
+  /* ── RIGHT: Onboarding Form Panel ── */
+  .form-panel {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    padding: 24px 22px;
+    position: sticky;
+    top: 24px;
+  }
+  .form-panel-header { margin-bottom: 20px; }
+  .form-panel-title {
+    font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700;
+    background: linear-gradient(90deg, #fff 20%, var(--teal));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    margin-bottom: 4px;
+  }
+  .form-panel-sub { font-size: 11px; color: var(--text3); }
+
+  .form-divider { height:1px; background: var(--border); margin: 16px 0; }
+
+  .form-group { margin-bottom: 13px; }
+  .form-label { display: block; font-size: 10px; color: var(--text2); letter-spacing: 0.05em; text-transform: uppercase; font-weight: 500; margin-bottom: 5px; }
+  .form-label .req { color: var(--coral); margin-left: 2px; }
+  .form-input, .form-select {
+    width: 100%; background: var(--surface2);
+    border: 1px solid var(--border2); border-radius: 8px;
+    padding: 9px 12px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 13px;
+    outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .form-input:focus, .form-select:focus {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(0,229,176,0.1);
+  }
+  .form-input::placeholder { color: var(--text3); }
+  .form-select option { background: var(--bg2); color: var(--text); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-error-msg { font-size: 10px; color: var(--coral); margin-top: 3px; display: none; }
+  .has-error .form-input,
+  .has-error .form-select { border-color: var(--coral) !important; box-shadow: 0 0 0 3px rgba(255,107,107,0.1); }
+  .has-error .form-error-msg { display: block; }
+
+  .submit-btn {
+    width: 100%; padding: 12px;
+    background: linear-gradient(135deg, var(--teal2), var(--blue));
+    border: none; border-radius: 10px; color: #fff;
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
+    cursor: pointer; letter-spacing: 0.02em;
+    box-shadow: 0 4px 20px rgba(0,229,176,0.3);
+    transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 6px;
+  }
+  .submit-btn:hover { box-shadow: 0 6px 28px rgba(0,229,176,0.5); transform: translateY(-1px); }
+  .submit-btn:active { transform: scale(0.98); }
+  .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* ── Response box (shows after submit) ── */
+  .response-box {
+    display: none;
+    background: var(--surface2);
+    border: 1px solid rgba(0,229,176,0.25);
+    border-radius: 10px;
+    padding: 14px;
+    margin-top: 14px;
+    animation: fadeIn 0.3s ease;
+  }
+  .response-box.show { display: block; }
+  .response-box.error { border-color: rgba(255,107,107,0.3); }
+  .resp-title { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 600; color: var(--teal); margin-bottom: 8px; }
+  .resp-title.err { color: var(--coral); }
+  .resp-row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+  .resp-row:last-child { border: none; }
+  .resp-key  { color: var(--text3); }
+  .resp-val  { color: var(--text); font-weight: 500; max-width: 55%; text-align: right; word-break: break-all; }
+
+  /* ── Bottom bar ── */
+  .bottom-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 16px; padding: 12px 18px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    flex-wrap: wrap; gap: 8px;
+  }
+  .last-run { font-size: 11px; color: var(--text3); }
+  .last-run span { color: var(--teal); font-weight: 500; }
+  .webhook-note { font-size: 10px; color: var(--text3); display: flex; align-items: center; gap: 6px; }
+  .webhook-url {
+    font-family: monospace; background: var(--surface2);
+    padding: 2px 8px; border-radius: 5px; font-size: 10px;
+    color: var(--blue); border: 1px solid var(--border);
+  }
+
+  /* ── Spinner ── */
+  .spin {
+    width: 13px; height: 13px;
+    border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff;
+    border-radius: 50%; animation: spinning 0.65s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spinning { to { transform: rotate(360deg); } }
+
+  /* ── Donut center ── */
+  .donut-wrap { position: relative; }
+  .donut-center {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); text-align: center; pointer-events: none;
+  }
+  .donut-center-val { font-family:'Syne',sans-serif; font-size:20px; font-weight:700; color:var(--text); }
+  .donut-center-lbl { font-size:9px; color:var(--text3); margin-top:2px; }
+
+  /* ── Employee table ── */
+  .emp-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .emp-table th {
+    text-align:left; padding:7px 10px;
+    color:var(--text3); font-size:10px; font-weight:500;
+    letter-spacing:0.05em; text-transform:uppercase;
+    border-bottom:1px solid var(--border2); white-space:nowrap;
+  }
+  .emp-table td {
+    padding:9px 10px; border-bottom:1px solid var(--border);
+    color:var(--text); vertical-align:middle;
+  }
+  .emp-table tbody tr:last-child td { border-bottom:none; }
+  .emp-table tbody tr { transition:background 0.15s; }
+  .emp-table tbody tr:hover td { background:var(--surface2); }
+  .emp-name  { font-weight:500; white-space:nowrap; }
+  .emp-init  {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:26px; height:26px; border-radius:50%;
+    font-size:10px; font-weight:600; margin-right:8px;
+    background:var(--teal3); color:var(--teal); flex-shrink:0; vertical-align:middle;
+  }
+  .emp-dept  { color:var(--text2); font-size:11px; }
+  .emp-email { color:var(--blue); font-size:11px; }
+  .emp-id    { font-family:monospace; font-size:10px; color:var(--text3); }
+  .emp-systems { color:var(--text2); font-size:11px; max-width:160px; }
+  .emp-date  { color:var(--text2); font-size:11px; white-space:nowrap; }
+  .done-pill { background:var(--green2); color:var(--green); font-size:10px; padding:2px 8px; border-radius:20px; font-weight:500; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg2); }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 99px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="brand">
+      <div class="brand-icon">🚀</div>
+      <div>
+        <div class="brand-title">HR Onboarding Intelligence</div>
+        <div class="brand-sub">n8n Automation Dashboard · Real-time</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+      <div class="status-pill status-idle" id="statusPill">
+        <span class="sdot" id="sdot"></span>
+        <span id="statusText">Idle</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-grid">
+    <div class="kpi-card c-teal">
+      <div class="kpi-icon-wrap">👥</div>
+      <div class="kpi-label">Total Onboarded</div>
+      <div class="kpi-value" id="kpi1">0</div>
+      <div class="kpi-delta delta-neu" id="kpi1d">No submissions yet</div>
+    </div>
+    <div class="kpi-card c-blue">
+      <div class="kpi-icon-wrap">✅</div>
+      <div class="kpi-label">Success Rate</div>
+      <div class="kpi-value" id="kpi2">—</div>
+      <div class="kpi-delta delta-neu" id="kpi2d">Awaiting first run</div>
+    </div>
+    <div class="kpi-card c-violet">
+      <div class="kpi-icon-wrap">⚡</div>
+      <div class="kpi-label">Automation Time</div>
+      <div class="kpi-value" id="kpi3">~4<span class="kpi-unit">m</span></div>
+      <div class="kpi-delta delta-neu" id="kpi3d">vs hours manually</div>
+    </div>
+    <div class="kpi-card c-amber">
+      <div class="kpi-icon-wrap">📋</div>
+      <div class="kpi-label">Completed Today</div>
+      <div class="kpi-value" id="kpi4">0</div>
+      <div class="kpi-delta delta-neu" id="kpi4d">No runs today</div>
+    </div>
+  </div>
+
+  <!-- MAIN LAYOUT: Charts left | Form right -->
+  <div class="main-layout">
+
+    <!-- LEFT COLUMN -->
+    <div class="left-col">
+
+      <!-- Charts row 1 -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-head">
+            <div>
+              <div class="chart-title">Onboarding Pipeline</div>
+              <div class="chart-sub">Steps completed per submission</div>
+            </div>
+            <span class="badge badge-teal" id="pipelineBadge">0 total</span>
+          </div>
+          <div style="position:relative;height:180px;">
+            <canvas id="c1"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head">
+            <div>
+              <div class="chart-title">By Department</div>
+              <div class="chart-sub">Submissions per dept</div>
+            </div>
+            <span class="badge badge-violet">Live</span>
+          </div>
+          <div class="donut-wrap">
+            <div class="donut-center" id="donutCenter">
+              <div class="donut-center-val" id="donutVal">0</div>
+              <div class="donut-center-lbl">Total</div>
+            </div>
+            <div style="position:relative;height:180px;">
+              <canvas id="c2"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts row 2 -->
+      <div class="charts-row2">
+        <div class="chart-card">
+          <div class="chart-head">
+            <div>
+              <div class="chart-title">Onboarding Trend</div>
+              <div class="chart-sub">Runs initiated vs completed today</div>
+            </div>
+            <span class="badge badge-blue" id="trendBadge">0 runs</span>
+          </div>
+          <div style="position:relative;height:160px;">
+            <canvas id="c3"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head">
+            <div>
+              <div class="chart-title">Automation Health</div>
+              <div class="chart-sub">Workflow node status</div>
+            </div>
+            <span class="badge badge-amber">n8n</span>
+          </div>
+          <div style="position:relative;height:160px;">
+            <canvas id="c4"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Onboarded Employees Table -->
+      <div class="chart-card" id="employeeTableCard">
+        <div class="chart-head" style="margin-bottom:12px;">
+          <div>
+            <div class="chart-title">
+              Onboarded Employees
+              <span id="sheetDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-left:7px;animation:livepulse 1s infinite;vertical-align:middle;"></span>
+            </div>
+            <div class="chart-sub" id="sheetLabel">Loading from Google Sheets…</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button onclick="loadFromSheets(true)" style="background:var(--surface2);border:1px solid var(--border2);color:var(--text2);border-radius:7px;padding:4px 11px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;">↻ Refresh</button>
+            <span class="badge badge-teal" id="empCountBadge">—</span>
+          </div>
+        </div>
+        <div id="tableWrap" style="overflow-x:auto;">
+          <div id="tableEmpty" style="text-align:center;padding:24px 0;color:var(--text3);font-size:12px;display:none;">
+            <div style="font-size:22px;margin-bottom:6px;">📋</div>
+            No records in Google Sheets yet. Submit the first onboarding above.
+          </div>
+          <table class="emp-table" id="empTable" style="display:none;">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Department</th>
+                <th>Work Email</th>
+                <th>Joining Date</th>
+                <th>Systems</th>
+                <th>Onboarded At</th>
+              </tr>
+            </thead>
+            <tbody id="empTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Activity feed -->
+      <div class="activity-card">
+        <div class="chart-head" style="margin-bottom:12px;">
+          <div>
+            <div class="chart-title">Recent Activity</div>
+            <div class="chart-sub">Live from n8n executions</div>
+          </div>
+          <span class="badge badge-teal" id="runCountBadge">0 runs today</span>
+        </div>
+        <ul class="activity-list" id="activityList">
+          <li id="emptyState" style="padding:28px 0;text-align:center;color:var(--text3);font-size:12px;list-style:none;">
+            <div style="font-size:26px;margin-bottom:8px;">📋</div>
+            No activity yet. Fill in the form and submit to start onboarding.
+          </li>
+        </ul>
+      </div>
+
+    </div><!-- /left-col -->
+
+    <!-- RIGHT COLUMN: Embedded Form -->
+    <div class="form-panel">
+      <div class="form-panel-header">
+        <div class="form-panel-title">New Employee Onboarding</div>
+        <div class="form-panel-sub">Fill in details and submit — n8n handles the rest</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" id="fg-fullName">
+          <label class="form-label">Full Name <span class="req">*</span></label>
+          <input class="form-input" id="f-fullName" placeholder="Priya Sharma" />
+          <div class="form-error-msg">Required</div>
+        </div>
+        <div class="form-group" id="fg-role">
+          <label class="form-label">Role <span class="req">*</span></label>
+          <input class="form-input" id="f-role" placeholder="Product Manager" />
+          <div class="form-error-msg">Required</div>
+        </div>
+      </div>
+
+      <div class="form-group" id="fg-email">
+        <label class="form-label">Personal Email <span class="req">*</span></label>
+        <input class="form-input" id="f-email" type="email" placeholder="employee@gmail.com" />
+        <div class="form-error-msg">Valid email required</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" id="fg-department">
+          <label class="form-label">Department <span class="req">*</span></label>
+          <select class="form-select" id="f-department">
+            <option value="">Select…</option>
+            <option>Engineering</option>
+            <option>Product</option>
+            <option>HR</option>
+            <option>Sales</option>
+            <option>Finance</option>
+            <option>Operations</option>
+          </select>
+          <div class="form-error-msg">Required</div>
+        </div>
+        <div class="form-group" id="fg-location">
+          <label class="form-label">Location <span class="req">*</span></label>
+          <input class="form-input" id="f-location" placeholder="Bangalore" />
+          <div class="form-error-msg">Required</div>
+        </div>
+      </div>
+
+      <div class="form-group" id="fg-managerId">
+        <label class="form-label">Manager Email <span class="req">*</span></label>
+        <input class="form-input" id="f-managerId" type="email" placeholder="manager@company.com" />
+        <div class="form-error-msg">Valid email required</div>
+      </div>
+
+      <div class="form-group" id="fg-joiningDate">
+        <label class="form-label">Joining Date <span class="req">*</span></label>
+        <input class="form-input" id="f-joiningDate" type="date" />
+        <div class="form-error-msg">Required</div>
+      </div>
+
+      <div class="form-divider"></div>
+
+      <button class="submit-btn" id="submitBtn" onclick="submitOnboarding()">
+        <svg viewBox="0 0 14 14" fill="white" style="width:13px;height:13px"><polygon points="2,1 13,7 2,13"/></svg>
+        Run Onboarding Workflow
+      </button>
+
+      <!-- Response shown after submit -->
+      <div class="response-box" id="responseBox">
+        <div class="resp-title" id="respTitle">✅ Onboarding Initiated</div>
+        <div id="respRows"></div>
+      </div>
+    </div><!-- /form-panel -->
+
+  </div><!-- /main-layout -->
+
+  <!-- BOTTOM BAR -->
+  <div class="bottom-bar">
+    <div class="last-run" id="lastRunBar">Last run: <span>Not yet triggered</span></div>
+    <div class="webhook-note">
+      Webhook: <span class="webhook-url">arrange-wireless-thwarting.ngrok-free.dev/webhook/hr-onboarding</span>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+const N8N_WEBHOOK  = 'https://arrange-wireless-thwarting.ngrok-free.dev/webhook/hr-onboarding';
+const SHEET_ID     = '1P29loNA6gmjGxnqetzZCEIOIT4mUZ-lAKLLvM-Vvr5E';
+const SHEET_CSV    = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+
+let totalOnboarded = 0;
+let totalToday = 0;
+let successCount = 0;
+let runCountVal = 0;
+let charts = {};
+const deptCounts = { Engineering:0, Sales:0, Product:0, HR:0, Finance:0, Operations:0 };
+const gridColor = 'rgba(255,255,255,0.05)';
+const tickColor = '#5A6080';
+
+document.getElementById('f-joiningDate').min = new Date().toISOString().split('T')[0];
+
+/* ─── CSV parser (handles quoted fields) ─── */
+function parseCSV(text) {
+  const rows = [];
+  const lines = text.split('\n');
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    cols.push(cur.trim());
+    rows.push(cols);
+  }
+  return rows;
+}
+
+/* ─── Load history from Google Sheets ─── */
+async function loadFromSheets(manual = false) {
+  const dot   = document.getElementById('sheetDot');
+  const label = document.getElementById('sheetLabel');
+  dot.style.background = 'var(--amber)';
+  label.textContent = 'Syncing with Google Sheets…';
+
+  try {
+    /* Cache-bust so refresh always gets latest */
+    const r = await fetch(SHEET_CSV + '&t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('fetch failed');
+    const text = await r.text();
+    const rows = parseCSV(text);
+    if (rows.length < 2) {
+      dot.style.background = 'var(--text3)';
+      dot.style.animation  = 'none';
+      label.textContent = 'No data in sheet yet';
+      document.getElementById('tableEmpty').style.display = 'block';
+      document.getElementById('empTable').style.display   = 'none';
+      return;
+    }
+
+    /* rows[0] = header, rows[1..] = data — newest last */
+    const dataRows = rows.slice(1).filter(r => r.length > 1 && r[1]);
+    const total    = dataRows.length;
+    const recent10 = dataRows.slice(-10).reverse(); /* last 10, newest first */
+
+    /* ── Update dept counts from ALL rows ── */
+    Object.keys(deptCounts).forEach(k => deptCounts[k] = 0);
+    dataRows.forEach(r => { if (deptCounts[r[4]] !== undefined) deptCounts[r[4]]++; });
+
+    /* ── Update KPIs ── */
+    totalOnboarded = total;
+    document.getElementById('kpi1').textContent = total;
+    document.getElementById('kpi1d').textContent = total > 0 ? `${total} total · all time` : 'No submissions yet';
+    document.getElementById('kpi1d').className   = total > 0 ? 'kpi-delta delta-up' : 'kpi-delta delta-neu';
+    document.getElementById('kpi4').textContent  = total;
+    document.getElementById('kpi4d').textContent = `${total} record${total!==1?'s':''} in sheet`;
+    document.getElementById('kpi4d').className   = total > 0 ? 'kpi-delta delta-up' : 'kpi-delta delta-neu';
+    if (total > 0) {
+      document.getElementById('kpi2').textContent = '100%';
+      document.getElementById('kpi2d').textContent = 'All runs logged successfully';
+      document.getElementById('kpi2d').className   = 'kpi-delta delta-up';
+    }
+
+    /* ── Populate employee table ── */
+    const tbody = document.getElementById('empTableBody');
+    tbody.innerHTML = '';
+    recent10.forEach((row, idx) => {
+      /* cols: 0=onboardingId 1=fullName 2=email 3=role 4=department 5=joiningDate
+               6=location 7=workEmail 8=systemsProvisioned 16=timestamp 17=status */
+      const name     = row[1] || '—';
+      const role     = row[3] || '—';
+      const dept     = row[4] || '—';
+      const workEmail= row[7] || '—';
+      const joinDate = row[5] || '—';
+      const systems  = row[8] || '—';
+      const ts       = row[16] ? new Date(row[16]).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+      const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      const avCls    = ['av-green','av-blue','av-violet','av-amber','av-coral'][idx % 5];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="emp-name"><span class="emp-init ${avCls}" style="background:none;border:1.5px solid currentColor;">${initials}</span>${name}</td>
+        <td class="emp-dept">${role}</td>
+        <td class="emp-dept">${dept}</td>
+        <td class="emp-email">${workEmail}</td>
+        <td class="emp-date">${joinDate}</td>
+        <td class="emp-systems">${systems}</td>
+        <td class="emp-id">${ts}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('empTable').style.display   = '';
+    document.getElementById('tableEmpty').style.display = 'none';
+    document.getElementById('empCountBadge').textContent = total + ' employee' + (total!==1?'s':'');
+
+    /* ── Populate activity feed from sheet (if first load) ── */
+    if (!manual && document.getElementById('emptyState')) {
+      document.getElementById('emptyState').remove();
+      const list = document.getElementById('activityList');
+      list.innerHTML = '';
+      recent10.slice(0, 5).forEach((row, idx) => {
+        const name  = row[1] || '—';
+        const dept  = row[4] || '—';
+        const role  = row[3] || '—';
+        const email = row[7] || '—';
+        const sys   = row[8] || '—';
+        const join  = row[5] || '';
+        const joinStr = join ? new Date(join+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '—';
+        const ts    = row[16] ? new Date(row[16]).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Previously';
+        const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        const cls   = ['av-green','av-blue','av-violet','av-amber','av-coral'][idx % 5];
+        const li = document.createElement('li');
+        li.className = 'activity-item';
+        li.innerHTML = `
+          <div class="act-avatar ${cls}">${initials}</div>
+          <div class="act-body">
+            <div class="act-name">${name} <span style="color:var(--text3);font-weight:400">· ${dept}</span></div>
+            <div class="act-detail">Role: ${role} · Work email: ${email} · Systems: ${sys}</div>
+            <div class="act-time">${ts} · Joining: ${joinStr}</div>
+          </div>
+          <span class="act-tag tag-done">Completed</span>`;
+        list.appendChild(li);
+      });
+      document.getElementById('runCountBadge').textContent = total + ' total runs';
+    }
+
+    buildCharts();
+
+    dot.style.background = 'var(--teal)';
+    dot.style.animation  = 'none';
+    label.textContent    = `Synced · ${total} record${total!==1?'s':''} · Last updated ${new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}`;
+
+  } catch(e) {
+    dot.style.background = 'var(--coral)';
+    dot.style.animation  = 'none';
+    label.textContent    = 'Could not load sheet — make sure it is shared publicly (Anyone with link → Viewer)';
+  }
+}
+
+/* ── Build / rebuild all charts ── */
+function buildCharts() {
+  const base = { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} } };
+
+  /* Pipeline bar */
+  const pVals = totalOnboarded > 0
+    ? [totalOnboarded,totalOnboarded,totalOnboarded,totalOnboarded,totalOnboarded,totalOnboarded]
+    : [0,0,0,0,0,0];
+  if(charts.c1) charts.c1.destroy();
+  charts.c1 = new Chart(document.getElementById('c1'), {
+    type:'bar',
+    data:{
+      labels:['Validate','Provision','Welcome','Checklist','Resources','Notify'],
+      datasets:[
+        { label:'Done',  data:pVals, backgroundColor:'#00E5B0', borderRadius:4 },
+        { label:'Pend',  data:[0,0,0,0,0,0], backgroundColor:'#2A2F48', borderRadius:4 }
+      ]
+    },
+    options:{ ...base, scales:{
+      x:{ stacked:true, ticks:{color:tickColor,font:{size:9}}, grid:{display:false} },
+      y:{ stacked:true, display:false }
+    }}
+  });
+  document.getElementById('pipelineBadge').textContent = totalOnboarded + ' total';
+
+  /* Dept donut */
+  const dv = ['Engineering','Sales','Product','HR','Finance'].map(d=>deptCounts[d]||0);
+  const hasData = dv.some(v=>v>0);
+  if(charts.c2) charts.c2.destroy();
+  charts.c2 = new Chart(document.getElementById('c2'), {
+    type:'doughnut',
+    data:{
+      labels:['Engineering','Sales','Product','HR','Finance'],
+      datasets:[{
+        data: hasData ? dv : [1,1,1,1,1],
+        backgroundColor: hasData
+          ? ['#00E5B0','#4D8EFF','#9B6DFF','#FFB648','#FF6B6B']
+          : ['#222840','#222840','#222840','#222840','#222840'],
+        borderWidth:0, hoverOffset:6
+      }]
+    },
+    options:{ ...base, cutout:'65%',
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(c)=> hasData ? `${c.label}: ${c.raw}` : 'No data' }}}
+    }
+  });
+  document.getElementById('donutVal').textContent = totalOnboarded;
+
+  /* Trend line */
+  if(charts.c3) charts.c3.destroy();
+  charts.c3 = new Chart(document.getElementById('c3'), {
+    type:'line',
+    data:{
+      labels: runCountVal > 0
+        ? Array.from({length: runCountVal}, (_,i) => 'Run '+(i+1))
+        : ['—'],
+      datasets:[
+        { label:'Completed', data: runCountVal > 0 ? Array.from({length:runCountVal},(_,i)=>i<successCount?1:0).reduce((a,v,i)=>[...a,(a[i-1]||0)+v],[]) : [0], borderColor:'#00E5B0', backgroundColor:'rgba(0,229,176,0.07)', fill:true, tension:0.4, pointRadius:3, pointBackgroundColor:'#00E5B0' },
+        { label:'Initiated', data: runCountVal > 0 ? Array.from({length:runCountVal},(_,i)=>i+1) : [0], borderColor:'#9B6DFF', borderDash:[5,4], backgroundColor:'transparent', tension:0.4, pointRadius:3, pointBackgroundColor:'#9B6DFF' }
+      ]
+    },
+    options:{ ...base, scales:{
+      x:{ ticks:{color:tickColor,font:{size:9}}, grid:{display:false} },
+      y:{ ticks:{color:tickColor,font:{size:10}}, grid:{color:gridColor}, min:0 }
+    }}
+  });
+  document.getElementById('trendBadge').textContent = runCountVal + ' run' + (runCountVal!==1?'s':'');
+
+  /* Radar */
+  if(charts.c4) charts.c4.destroy();
+  charts.c4 = new Chart(document.getElementById('c4'), {
+    type:'radar',
+    data:{
+      labels:['Speed','Recovery','Sync','Email','Tasks','Notify'],
+      datasets:[{
+        label:'Health',
+        data: totalOnboarded>0 ? [95,90,100,100,100,100] : [0,0,0,0,0,0],
+        backgroundColor:'rgba(0,229,176,0.1)',
+        borderColor:'#00E5B0', borderWidth:2,
+        pointBackgroundColor:'#00E5B0', pointRadius:3
+      }]
+    },
+    options:{ ...base, scales:{ r:{
+      ticks:{display:false}, grid:{color:'rgba(255,255,255,0.07)'},
+      pointLabels:{color:tickColor,font:{size:9}}, min:0, max:100
+    }}}
+  });
+}
+buildCharts();
+
+/* Load sheet data on page open */
+loadFromSheets(false);
+
+/* ── Employee table ── */
+const avClasses = ['av-green','av-blue','av-violet','av-amber','av-coral'];
+function addEmployeeRow(payload, res) {
+  /* Show table, hide empty state */
+  document.getElementById('empTable').style.display   = '';
+  document.getElementById('tableEmpty').style.display = 'none';
+  const tbody    = document.getElementById('empTableBody');
+  const initials = payload.fullName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const joinStr  = payload.joiningDate
+    ? new Date(payload.joiningDate+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})
+    : '—';
+  const nowStr   = new Date().toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const avCls    = avClasses[totalOnboarded % 5];
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="emp-name"><span class="emp-init ${avCls}" style="background:none;border:1.5px solid currentColor;">${initials}</span>${payload.fullName}</td>
+    <td class="emp-dept">${payload.role}</td>
+    <td class="emp-dept">${payload.department}</td>
+    <td class="emp-email">${res.workEmail || '—'}</td>
+    <td class="emp-date">${joinStr}</td>
+    <td class="emp-systems">${res.systemsProvisioned || '—'}</td>
+    <td class="emp-id">${nowStr}</td>`;
+  tbody.insertBefore(tr, tbody.firstChild);
+  document.getElementById('empCountBadge').textContent = tbody.rows.length + ' employee' + (tbody.rows.length!==1?'s':'');
+}
+
+/* ── Activity feed ── */
+function addActivity(name, dept, detail, joiningDate, isError) {
+  const emptyState = document.getElementById('emptyState');
+  if (emptyState) emptyState.remove();
+
+  const list = document.getElementById('activityList');
+  const li = document.createElement('li');
+  li.className = 'activity-item';
+  const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const cls = avClasses[totalOnboarded % 5];
+  const joinStr = joiningDate
+    ? new Date(joiningDate+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})
+    : '—';
+  li.innerHTML = `
+    <div class="act-avatar ${isError?'av-coral':cls}">${initials}</div>
+    <div class="act-body">
+      <div class="act-name">${name} <span style="color:var(--text3);font-weight:400">· ${dept}</span></div>
+      <div class="act-detail">${detail}</div>
+      <div class="act-time">Just now · Joining: ${joinStr}</div>
+    </div>
+    <span class="act-tag ${isError?'tag-err':'tag-done'}">${isError?'Error':'Completed'}</span>`;
+  list.insertBefore(li, list.firstChild);
+  if (list.children.length > 8) list.removeChild(list.lastChild);
+}
+
+/* ── Validation ── */
+function validate() {
+  let ok = true;
+  document.querySelectorAll('.form-group[id^="fg-"]').forEach(g => g.classList.remove('has-error'));
+  const check = (id, fn) => {
+    const el = document.getElementById('f-'+id);
+    if (!fn(el.value)) { document.getElementById('fg-'+id).classList.add('has-error'); ok = false; }
+  };
+  check('fullName',    v => v.trim().length > 1);
+  check('email',       v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()));
+  check('role',        v => v.trim().length > 1);
+  check('department',  v => v !== '');
+  check('location',    v => v.trim().length > 1);
+  check('managerId',   v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()));
+  check('joiningDate', v => v !== '');
+  return ok;
+}
+
+/* ── Show response inside panel ── */
+function showResponse(data, isError) {
+  const box = document.getElementById('responseBox');
+  const title = document.getElementById('respTitle');
+  const rows = document.getElementById('respRows');
+  box.className = 'response-box show' + (isError ? ' error' : '');
+  title.className = 'resp-title' + (isError ? ' err' : '');
+  if (isError) {
+    title.textContent = '❌ Workflow Error';
+    rows.innerHTML = `<div class="resp-row"><span class="resp-key">Status</span><span class="resp-val" style="color:var(--coral)">No response from n8n</span></div>
+      <div class="resp-row"><span class="resp-key">Action</span><span class="resp-val">Check n8n execution log</span></div>`;
+  } else {
+    title.textContent = '✅ Onboarding Initiated';
+    rows.innerHTML = Object.entries({
+      'Onboarding ID':   data.onboardingId || '—',
+      'Work Email':      data.workEmail || '—',
+      'Systems':         data.systemsProvisioned || '—',
+      'Status':          data.status || 'success',
+    }).map(([k,v]) => `<div class="resp-row"><span class="resp-key">${k}</span><span class="resp-val">${v}</span></div>`).join('');
+  }
+}
+
+/* ── Submit ── */
+async function submitOnboarding() {
+  if (!validate()) return;
+
+  const btn  = document.getElementById('submitBtn');
+  const pill = document.getElementById('statusPill');
+  const sdot = document.getElementById('sdot');
+  const stxt = document.getElementById('statusText');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Sending to n8n…';
+  pill.className = 'status-pill status-run';
+  sdot.className = 'sdot sdot-pulse';
+  stxt.textContent = 'Running';
+  document.getElementById('responseBox').className = 'response-box';
+
+  const payload = {
+    fullName:    document.getElementById('f-fullName').value.trim(),
+    email:       document.getElementById('f-email').value.trim(),
+    role:        document.getElementById('f-role').value.trim(),
+    department:  document.getElementById('f-department').value,
+    managerId:   document.getElementById('f-managerId').value.trim(),
+    joiningDate: document.getElementById('f-joiningDate').value,
+    location:    document.getElementById('f-location').value.trim(),
+    teamChannel: '#general',
+  };
+
+  let res = null;
+  let ok  = false;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 40000);
+    const r = await fetch(N8N_WEBHOOK, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload), signal: ctrl.signal
+    });
+    clearTimeout(t);
+    if (r.ok) { res = await r.json(); ok = true; }
+  } catch(e) { ok = false; }
+
+  runCountVal++;
+
+  if (ok && res) {
+    totalOnboarded++;
+    totalToday++;
+    successCount++;
+    if (deptCounts[payload.department] !== undefined) deptCounts[payload.department]++;
+
+    addEmployeeRow(payload, res);
+    addActivity(
+      payload.fullName, payload.department,
+      `Role: ${payload.role} · Work email: ${res.workEmail||'—'} · Systems: ${res.systemsProvisioned||'—'} · IT notified · Welcome email sent · Trello card created`,
+      payload.joiningDate, false
+    );
+    showResponse(res, false);
+
+    const rate = Math.round((successCount/runCountVal)*100);
+    document.getElementById('kpi1').textContent = totalOnboarded;
+    document.getElementById('kpi1d').textContent = `↑ ${totalToday} today`;
+    document.getElementById('kpi1d').className = 'kpi-delta delta-up';
+    document.getElementById('kpi2').textContent = rate + '%';
+    document.getElementById('kpi2d').textContent = `${successCount} of ${runCountVal} succeeded`;
+    document.getElementById('kpi2d').className = 'kpi-delta delta-up';
+    document.getElementById('kpi4').textContent = totalToday;
+    document.getElementById('kpi4d').textContent = `${totalToday} run${totalToday!==1?'s':''} today`;
+    document.getElementById('kpi4d').className = 'kpi-delta delta-up';
+
+    pill.className = 'status-pill status-done';
+    stxt.textContent = 'Completed';
+
+    /* Refresh sheet after 8s — gives n8n time to write the row */
+    setTimeout(() => loadFromSheets(true), 8000);
+
+    /* Clear form */
+    ['fullName','email','role','department','managerId','joiningDate','location']
+      .forEach(id => { const el = document.getElementById('f-'+id); el.tagName==='SELECT'?el.value='':el.value=''; });
+
+  } else {
+    addActivity(payload.fullName, payload.department,
+      'Workflow did not respond — check n8n execution log', payload.joiningDate, true);
+    showResponse(null, true);
+    const rate = runCountVal>0?Math.round((successCount/runCountVal)*100):0;
+    document.getElementById('kpi2').textContent = rate + '%';
+    document.getElementById('kpi2d').textContent = `${successCount} of ${runCountVal} succeeded`;
+    pill.className = 'status-pill status-err';
+    stxt.textContent = 'Error';
+  }
+
+  buildCharts();
+
+  document.getElementById('runCountBadge').textContent = runCountVal + ' run' + (runCountVal!==1?'s':'') + ' today';
+  const now = new Date();
+  document.getElementById('lastRunBar').innerHTML = 'Last run: <span>' +
+    now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) + '</span>';
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg viewBox="0 0 14 14" fill="white" style="width:13px;height:13px"><polygon points="2,1 13,7 2,13"/></svg> Run Onboarding Workflow';
+
+  setTimeout(() => {
+    pill.className = 'status-pill status-idle';
+    sdot.className = 'sdot';
+    stxt.textContent = 'Idle';
+  }, 7000);
+}
+</script>
+</body>
+</html>

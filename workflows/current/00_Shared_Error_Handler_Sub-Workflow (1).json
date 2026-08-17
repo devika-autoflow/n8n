@@ -1,0 +1,254 @@
+{
+  "name": "00_Shared_Error_Handler_Sub-Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst msg = (item.errorMessage || '').toLowerCase();\nlet category = 'unknown';\nif (msg.includes('rate limit') || msg.includes('429')) category = 'rate_limit';\nelse if (msg.includes('timeout') || msg.includes('econnaborted')) category = 'timeout';\nelse if (msg.includes('5') && msg.match(/5\\d\\d/)) category = 'server_error';\nelse if (msg.includes('401') || msg.includes('403')) category = 'auth';\nelse if (msg.includes('validation') || msg.includes('400')) category = 'validation';\n\nconst retryable = ['rate_limit','timeout','server_error'].includes(category);\nconst maxRetries = category === 'rate_limit' ? 3 : 2;\n\nreturn [{ json: { ...item, errorCategory: category, retryable, maxRetries } }];"
+      },
+      "id": "86a3f227-9563-49a6-a250-128fa1f4e469",
+      "name": "Classify Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        688
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BMCRHJH9U",
+          "mode": "list",
+          "cachedResultName": "career-factory-alerts"
+        },
+        "text": "=🚨 Workflow Failure Alert\n\n🔧 Workflow: {{ $('When Executed by Another Workflow').item.json.workflowName }}\n📍 Failed Node: {{ $('When Executed by Another Workflow').item.json.nodeName }}\n\n📂 Category: {{ $('Classify Error').item.json.errorCategory }}\n🔁 Retries: {{ $('Classify Error').item.json.retryCount }} / {{ $('Classify Error').item.json.maxRetries }} (Exhausted)\n\n❌ Error:\n{{ $('Classify Error').item.json.errorMessage }}\n\n📦 Payload Status:\nA snapshot of the failed payload has been stored in the `dead_letter_queue` for investigation.",
+        "otherOptions": {}
+      },
+      "id": "d98d9ef7-3abd-445a-a8ac-89ec04f72dc6",
+      "name": "Notify Slack #career-factory-alerts",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        688
+      ],
+      "webhookId": "1fba6e02-7ba6-4826-820e-fa8b41bcb2f0",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "action",
+              "type": "string",
+              "value": "dead_letter"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f8c54c19-2dc1-43ac-a902-e5b3ef3b7593",
+      "name": "Return Dead-Letter Signal",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "devikaraj5885@gmail.com",
+        "subject": "=[Career Content Factory] {{ $('When Executed by Another Workflow').item.json.workflowName }} - Dead Letter",
+        "emailType": "text",
+        "message": "=Workflow: {{ $('When Executed by Another Workflow').item.json.workflowName }}\nNode: {{ $('When Executed by Another Workflow').item.json.nodeName }}\nCategory: {{ $('Classify Error').item.json.errorCategory }}\nError: {{ $('Classify Error').item.json.errorMessage }}\nRetry count: {{ $('Classify Error').item.json.retryCount }}\n\nAction required: review dead_letter_queue table and replay manually.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -64,
+        688
+      ],
+      "id": "1ee5dca5-4710-4254-ad53-52ccdeb56cc4",
+      "name": "Send a message",
+      "webhookId": "c95e523d-7526-4e4d-9284-3b726d0c3f1f",
+      "retryOnFail": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "aw0729XCociMNVtw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "workflowName"
+            },
+            {
+              "name": "nodeName"
+            },
+            {
+              "name": "payload",
+              "type": "object"
+            },
+            {
+              "name": "errorMessage"
+            },
+            {
+              "name": "retryCount",
+              "type": "number"
+            },
+            {
+              "name": "executionId"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -928,
+        688
+      ],
+      "id": "11761e1e-debd-4ff8-a8d6-26544f8418c6",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bxtyomzvyyjngvwwbfqq.supabase.co/rest/v1/dead_letter_queue",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow_name: $json.workflowName, node_name: $json.nodeName, payload: $json.payload, error_message: $json.errorMessage, retry_count: Number($json.retryCount) || 0 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -480,
+        688
+      ],
+      "id": "0352c7c2-9024-4baa-9662-c266b29ffa33",
+      "name": "Insert into Dead Letter Queue",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bxtyomzvyyjngvwwbfqq.supabase.co/rest/v1/rpc/mark_workflow_failed",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n({\n  p_execution_id: $('When Executed by Another Workflow').item.json.executionId,\n  p_error_message: $('Classify Error').item.json.errorMessage\n})\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -256,
+        688
+      ],
+      "id": "1332be78-e094-44db-a7f8-fd9f6d9f0a17",
+      "name": "Mark Workflow Run Failed",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "fQVqgkOGVZ6Zw47v",
+          "name": "content_factory"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Classify Error": {
+      "main": [
+        [
+          {
+            "node": "Insert into Dead Letter Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Slack #career-factory-alerts": {
+      "main": [
+        [
+          {
+            "node": "Return Dead-Letter Signal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack #career-factory-alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Classify Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert into Dead Letter Queue": {
+      "main": [
+        [
+          {
+            "node": "Mark Workflow Run Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Workflow Run Failed": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  }
+}

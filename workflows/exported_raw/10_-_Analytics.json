@@ -1,0 +1,823 @@
+{
+  "name": "10_-_Analytics",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "0 30 15 * * *"
+            }
+          ]
+        }
+      },
+      "id": "14c61ead-4a34-4257-830a-3b90bb0bccd9",
+      "name": "Every Day 9:00 PM IST",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -1184,
+        256
+      ],
+      "notes": "15:30 UTC = 21:00 IST"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "mode"
+            }
+          ]
+        }
+      },
+      "id": "0fadc2e3-c784-494d-88c6-03e3c672bbdf",
+      "name": "When Called (weekly mode)",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1184,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/publish_targets?select=*&status=eq.published&deleted_at=is.null&published_at=gt.{{ $now.minus({ days: 90 }).toISODate() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w10n-fetchtargets",
+      "name": "Fetch Published publish_targets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -960,
+        368
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "id": "8a287687-b985-4b66-9521-2610a5164772",
+      "name": "Loop Publish Targets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -800,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "instagram_reel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "842ed97e-8b23-48ea-a492-d69e3db18d94"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "facebook_post",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "ed42bc5e-7027-4ad3-a0af-38928365ad72"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "youtube_shorts",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "24f585fa-d3fb-4843-9e90-ba00d294e5d0"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "linkedin_post",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "bb3a958d-ecb3-4592-b0ca-0500a230e8d1"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "w10n-routeplatform",
+      "name": "Route by Platform",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -608,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v20.0/{{ $json.external_post_id }}/insights",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "metric",
+              "value": "views,reach,likes,comments,shares,saved"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "ig-insights-da907512-053c-477b-b3f8-05db956ce73a",
+      "name": "GET Instagram Insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        -320
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "qioBP8RfixfNpC5H",
+          "name": "fb-asses token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://youtubeanalytics.googleapis.com/v2/reports",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "ids",
+              "value": "channel==MINE"
+            },
+            {
+              "name": "startDate",
+              "value": "={{$today.minus({days:1}).toFormat('yyyy-MM-dd')}}"
+            },
+            {
+              "name": "endDate",
+              "value": "={{$today.toFormat('yyyy-MM-dd')}}"
+            },
+            {
+              "name": "metrics",
+              "value": "views,estimatedMinutesWatched,averageViewPercentage,likes,comments,shares,subscribersGained"
+            },
+            {
+              "name": "filters",
+              "value": "=video=={{$json.external_post_id}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "2779680d-7a9a-4d8e-b249-1c9cfe6c616f",
+      "name": "GET YouTube Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        64
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "4gzD6emUjxclMtiS",
+          "name": "YouTube account -sugg"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://api.linkedin.com/v2/organizationalEntityShareStatistics",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "shares",
+              "value": "={{$json.external_post_id}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "d9410875-eff8-4557-b16f-254ae204f6d2",
+      "name": "GET LinkedIn Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        256
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "kDdRed6YTk0l4qtA",
+          "name": "linkeidn"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const target = $('Loop Publish Targets').item.json;\nconst body = $json;\nconst platform = target.platform;\n\nfunction fromInstagram() {\n  const d = {};\n  (body.data || []).forEach(m => { d[m.name] = m.values?.[0]?.value || 0; });\n  return { views: d.views || d.impressions || 0, reach: d.reach || 0, likes: d.likes || 0, comments: d.comments || 0, shares: d.shares || 0, saves: d.saved || 0, watch_time_seconds: 0, retention_pct: 0, new_subscribers: 0, new_followers: 0, ctr_pct: 0, completion_rate_pct: 0 };\n}\nfunction fromFacebookVideo() {\n  const d = {};\n  (body.data || []).forEach(m => { d[m.name] = m.values?.[0]?.value || 0; });\n  return { views: d.total_video_views || 0, reach: d.total_video_impressions || 0, likes: 0, comments: 0, shares: 0, saves: 0, watch_time_seconds: 0, retention_pct: 0, new_subscribers: 0, new_followers: 0, ctr_pct: 0, completion_rate_pct: 0 };\n}\nfunction fromYoutube() {\n  const row = body.rows?.[0] || [];\n  return { views: row[0]||0, watch_time_seconds: (row[1]||0)*60, retention_pct: row[2]||0, likes: row[3]||0, comments: row[4]||0, shares: row[5]||0, new_subscribers: row[6]||0, reach: 0, saves: 0, new_followers: 0, ctr_pct: 0, completion_rate_pct: row[2]||0 };\n}\nfunction fromLinkedin() {\n  const el = body.elements?.[0]?.totalShareStatistics || {};\n  return { views: el.impressionCount||0, likes: el.likeCount||0, comments: el.commentCount||0, shares: el.shareCount||0, ctr_pct: el.clickCount && el.impressionCount ? (el.clickCount/el.impressionCount*100) : 0, reach: 0, saves: 0, watch_time_seconds: 0, retention_pct: 0, new_subscribers: 0, new_followers: 0, completion_rate_pct: 0 };\n}\n\nlet metrics = {};\nif (platform === 'instagram_reel') metrics = fromInstagram();\nelse if (platform === 'facebook_post') metrics = fromFacebookVideo();\nelse if (platform === 'youtube_shorts') metrics = fromYoutube();\nelse if (platform === 'linkedin_post') metrics = fromLinkedin();\n\nreturn [{ json: { publish_target_id: target.id, ...metrics, raw_payload: body } }];\n"
+      },
+      "id": "2b311808-53a8-4e24-8013-cd895effeb76",
+      "name": "Normalize Metrics to analytics Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        -128
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/analytics",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { publish_target_id: $json.publish_target_id, metric_date: $now.toFormat('yyyy-MM-dd'), views: $json.views, reach: $json.reach, watch_time_seconds: $json.watch_time_seconds, retention_pct: $json.retention_pct, likes: $json.likes, comments: $json.comments, shares: $json.shares, saves: $json.saves, new_subscribers: $json.new_subscribers, new_followers: $json.new_followers, ctr_pct: $json.ctr_pct, completion_rate_pct: $json.completion_rate_pct, raw_payload: $json.raw_payload } }}",
+        "options": {}
+      },
+      "id": "w10n-upsertanalytics",
+      "name": "Upsert analytics (today)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        160,
+        -128
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "aafe3a52-d379-47d2-ac0d-825e451e5636",
+      "name": "Next Batch",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        384,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('When Called (weekly mode)').isExecuted && $('When Called (weekly mode)').item.json.mode === 'weekly' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "7f252f6a-02f1-4d2c-9075-20798a5fc278",
+      "name": "Weekly Rollup Requested?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://fxhrigzjvpmjvbblbqqr.supabase.co/rest/v1/analytics?select=views,likes,comments,shares,completion_rate_pct,publish_targets(platform)&metric_date=gt.{{ $now.minus({ days: 7 }).toFormat('yyyy-MM-dd') }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "w10n-fetchweeklyraw",
+      "name": "Fetch Weekly Raw Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -288,
+        464
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "U3BiJKerRxLiMMmT",
+          "name": "content_factory"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(function(i) { return i.json; });\nconst byPlatform = {};\nrows.forEach(function(r) {\n  const platform = (r.publish_targets && r.publish_targets.platform) || 'unknown';\n  if (!byPlatform[platform]) byPlatform[platform] = { platform: platform, total_views: 0, total_likes: 0, total_comments: 0, total_shares: 0, completion_sum: 0, completion_count: 0 };\n  const p = byPlatform[platform];\n  p.total_views += r.views || 0;\n  p.total_likes += r.likes || 0;\n  p.total_comments += r.comments || 0;\n  p.total_shares += r.shares || 0;\n  if (typeof r.completion_rate_pct === 'number') { p.completion_sum += r.completion_rate_pct; p.completion_count += 1; }\n});\n\nconst summary = Object.values(byPlatform).map(function(p) {\n  return {\n    platform: p.platform,\n    total_views: p.total_views,\n    total_likes: p.total_likes,\n    total_comments: p.total_comments,\n    total_shares: p.total_shares,\n    avg_completion: p.completion_count ? Math.round((p.completion_sum / p.completion_count) * 100) / 100 : 0\n  };\n}).sort(function(a, b) { return b.total_views - a.total_views; });\n\nreturn summary.map(function(s) { return { json: s }; });\n"
+      },
+      "id": "w10n-buildsummary",
+      "name": "Build Weekly Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        464
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BMCRHJH9U",
+          "mode": "list",
+          "cachedResultName": "career-factory-alerts"
+        },
+        "text": "=:bar_chart: Weekly performance — {{ $json.platform }}: {{ $json.total_views }} views, {{ $json.total_likes }} likes, {{ $json.total_comments }} comments, {{ $json.total_shares }} shares, {{ $json.avg_completion }}% avg completion",
+        "otherOptions": {}
+      },
+      "id": "33d693af-8b3d-46df-aab1-cef80111c625",
+      "name": "Slack: Weekly Performance Summary",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        464
+      ],
+      "webhookId": "36b73611-8306-4910-b66b-ebc0a331d61e",
+      "retryOnFail": true,
+      "credentials": {
+        "slackApi": {
+          "id": "iPNPr0Rubjo42A0J",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "VKGVHp8eMKJLBfAW",
+          "cachedResultName": "11_-_AI_Learning_Engine"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "84a03dec-b784-4c20-8607-ff1287a0418b",
+      "name": "Execute: AI Learning Engine",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        384,
+        464
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v20.0/{{ $json.external_post_id }}/video_insights",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": []
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "fb-video-insights-1786022728597",
+      "name": "GET Facebook Video Insights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -240,
+        -128
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "jzSjdLBgAVEKlDJs",
+          "name": "fb asses token new"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v20.0/me/permissions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "130cbd1d-36a7-4d34-9099-41f1e7cccb48",
+      "name": "GET Instagram Insights1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        784,
+        -240
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "qioBP8RfixfNpC5H",
+          "name": "fb-asses token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "21da7607-9dcb-4889-9774-596a7064441e",
+              "name": "external_post_id",
+              "value": "={{ $json.external_post_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -400,
+        -112
+      ],
+      "id": "955abb23-570e-4a0f-ab4e-2c8ab76d340c",
+      "name": "Edit Fields"
+    }
+  ],
+  "pinData": {
+    "Every Day 9:00 PM IST": [
+      {
+        "json": {},
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Every Day 9:00 PM IST": {
+      "main": [
+        [
+          {
+            "node": "Fetch Published publish_targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Called (weekly mode)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Published publish_targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Published publish_targets": {
+      "main": [
+        [
+          {
+            "node": "Loop Publish Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Publish Targets": {
+      "main": [
+        [
+          {
+            "node": "Weekly Rollup Requested?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route by Platform",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Platform": {
+      "main": [
+        [
+          {
+            "node": "GET Instagram Insights",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GET YouTube Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GET LinkedIn Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Next Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET YouTube Analytics": {
+      "main": [
+        [
+          {
+            "node": "Normalize Metrics to analytics Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET LinkedIn Analytics": {
+      "main": [
+        [
+          {
+            "node": "Normalize Metrics to analytics Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Metrics to analytics Row": {
+      "main": [
+        [
+          {
+            "node": "Upsert analytics (today)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert analytics (today)": {
+      "main": [
+        [
+          {
+            "node": "Next Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Batch": {
+      "main": [
+        [
+          {
+            "node": "Loop Publish Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Rollup Requested?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Weekly Raw Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Weekly Raw Analytics": {
+      "main": [
+        [
+          {
+            "node": "Build Weekly Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Weekly Summary": {
+      "main": [
+        [
+          {
+            "node": "Slack: Weekly Performance Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: Weekly Performance Summary": {
+      "main": [
+        [
+          {
+            "node": "Execute: AI Learning Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET Instagram Insights": {
+      "main": [
+        [
+          {
+            "node": "Normalize Metrics to analytics Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET Facebook Video Insights": {
+      "main": [
+        [
+          {
+            "node": "Normalize Metrics to analytics Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "GET Facebook Video Insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d6efe351-4698-4270-bcd6-50252b6c0c14",
+  "meta": {
+    "instanceId": "f59fd08d81badd07cb9450cc12cd05722e59eba1c557ed5cd34a2ae43b2d5fe3"
+  },
+  "nodeGroups": [],
+  "id": "Ujbp9WT77pWMi3tH",
+  "tags": []
+}
