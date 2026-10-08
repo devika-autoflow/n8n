@@ -1,0 +1,198 @@
+{
+  "name": "Training 3 — Lookup & Conditional Email",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "training-lookup",
+        "options": {}
+      },
+      "id": "c1111111-1111-4111-8111-111111111111",
+      "name": "Webhook — Lookup Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -360,
+        0
+      ],
+      "webhookId": "c1111111-1111-4111-8111-111111111111"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "training_submissions",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "condition": "eq",
+              "keyValue": "={{ ($json.body.email || '').toLowerCase().trim() }}"
+            }
+          ]
+        }
+      },
+      "id": "c2222222-2222-4222-8222-222222222222",
+      "name": "Supabase — Find by Email",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -120,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.id ?? '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c3333333-3333-4333-8333-333333333333",
+      "name": "IF — Member Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "We found your record",
+        "emailType": "text",
+        "message": "=Hello {{ $json.full_name }},\n\nWe located your submission (category: {{ $json.category }}).\nOur team will be in touch shortly.\n\nThanks.",
+        "options": {}
+      },
+      "id": "c4444444-4444-4444-8444-444444444444",
+      "name": "Gmail — Found",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        380,
+        -120
+      ],
+      "webhookId": "c4444444-4444-4444-8444-444444444444",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a05A9Hadr3xDgrNU",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook — Lookup Request').item.json.body.email }}",
+        "subject": "We could not find your record",
+        "emailType": "text",
+        "message": "=Hello,\n\nWe could not find a submission for this email address.\nPlease submit your details again so we can help you.\n\nThanks.",
+        "options": {}
+      },
+      "id": "c5555555-5555-4555-8555-555555555555",
+      "name": "Gmail — Not Found",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        380,
+        120
+      ],
+      "webhookId": "c5555555-5555-4555-8555-555555555555",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a05A9Hadr3xDgrNU",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Training 3 — Lookup & Conditional Email\n\n**Nodes:** Webhook · Supabase (read) · IF · Gmail ×2\n\n**Flow:** find `email` in `training_submissions` → IF found send \"found\" email, else send \"not found\" email\n\n**Setup:** run `00_supabase_setup.sql` first\n\n---\n\n### 🧪 Test 1 — Found branch ✅\n\n```json\n{ \"email\": \"aravindsg072@gmail.com\" }\n```\n\n### 🧪 Test 2 — Not found branch ❌\n\n```json\n{ \"email\": \"nobody@example.com\" }\n```",
+        "height": 600,
+        "width": 460
+      },
+      "id": "c6666666-6666-4666-8666-666666666666",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        -780
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — Lookup Request": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Find by Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase — Find by Email": {
+      "main": [
+        [
+          {
+            "node": "IF — Member Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Member Found?": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Found",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail — Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

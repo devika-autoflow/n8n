@@ -1,0 +1,2540 @@
+{
+  "name": "PensionCo GE Automation — Main Workflow (with Confidence Check)DASHBOARD",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "members",
+        "filterType": "string",
+        "filterString": "=member_nino=eq.{{ $('⚙️ Set — Parsed AI Fields').item.json.member_nino }}"
+      },
+      "id": "478005a5-cd7f-46f4-8c1b-3d6f531f68c9",
+      "name": "🗄️ Supabase — Get Member by NINO",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        384
+      ],
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "272adbcd-9595-4a84-a273-c68bc970294c",
+              "leftValue": "={{ $json.member_nino }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "4c0a8b12-6924-4879-8f78-d114a17266a5",
+      "name": "🔀 Member Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -112,
+        384
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2777d95f-58b6-4da7-be07-af7015fb28f2",
+              "leftValue": "={{ $('⚙️ Set — Parsed AI Fields').item.json.sender_type }}",
+              "rightValue": "IFA",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c8cecabe-813d-4a47-8327-a5aef244db67",
+      "name": "🔀 Sender Type — IFA or Member?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        112,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "541b6f12-1be1-474f-a116-78101771e0db",
+              "leftValue": "={{ $('⚙️ Set — Parsed AI Fields').item.json.loa_present }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "044a1987-cf31-48b3-aba5-b73d30182bc1",
+              "leftValue": "={{ $('⚙️ Set — Parsed AI Fields').item.json.loa_date ? (new Date() - new Date($('⚙️ Set — Parsed AI Fields').item.json.loa_date)) / 86400000 < 365 : false }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "99be640f-3806-41b1-90c0-55d779d6ca0b",
+      "name": "🔐 LOA — Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        336,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Draft an acknowledgement letter.\n\n\nMember Name: {{ $('⚙️ Set — Parsed AI Fields').item.json.member_name }}\nMember nino: [MEMBER-NINO]\nAddress: [ADDRESS]\nCase Reference: {{ $('📁 BEST — Create Case').item.json.case_id }}\nCAP Reference: {{ $('set cap reference').item.json.cap_reference }}\nQuery: {{ $('⚙️ Set — Parsed AI Fields').item.json.query_summary }}\nSLA Date: {{ $('📁 BEST — Create Case').item.json.sla_target_date }}\nDate: {{ $now.format('d MMMM yyyy') }}\n\nPrevious Correspondence Context:\n{{ $('mask').item.json.maskedPrevCorrespondence || \"\" }}\n\nWrite the letter now.",
+        "options": {
+          "systemMessage": "=You are a professional administration assistant for PensionCo.\nLocated at 1 Finance Square, London, EC2V 8AB.\nPhone: 0800 123 4567. Email: admin@pensionco-demo.co.uk\n\nWrite a short professional acknowledgement letter using exactly the \ndetails provided below.\n\nRules:\n\n- No bold formatting or markdown  \n- No bullet points — write in plain paragraphs\n- Keep it under 200 words\n- The opening line must reflect the actual query — do not use generic \n  phrases like \"pension query\". If the query is about a transfer use \n  \"transfer request\", if it is about benefits use \"benefits enquiry\", \n  if it is about retirement use \"retirement request\" and so on\n- Sign off as: The ABCD Administration Team\n- Do not invent or add any information not provided",
+          "maxIterations": 2
+        }
+      },
+      "id": "3cd2b149-7e08-42a7-8fa1-3b9632db2a5c",
+      "name": "🤖 AI — Draft Response Letter",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2576,
+        192
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "50adefc8-8e36-4a78-bab3-1a568610be04",
+              "name": "cap_reference",
+              "value": "={{ $json.cap_reference }}",
+              "type": "string"
+            },
+            {
+              "id": "28a2465c-8609-46a7-a548-71379209ad09",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1008,
+        384
+      ],
+      "id": "a7511002-b8d3-484c-a50c-cd2812c2bf9a",
+      "name": "set cap reference"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1904,
+        288
+      ],
+      "id": "b9592114-3bb5-4f78-b105-b1dd756fa81c",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── 1. Get AI output + clean ──────────────────────────────────\nlet text = $json.output ?? '';\ntext = text.replace(/```json/g, '')\n           .replace(/```/g, '')\n           .replace(/'''/g, '')\n           .trim()\n           .replace(/\\r\\n/g, '\\n')\n           .replace(/\\n{3,}/g, '\\n\\n');\n\n// ── 2. Pull real values from each node ───────────────────────\nconst piiData  = $('data masking').item.json.piiData       ?? {};\nconst names    = $('data masking').item.json.detectedNames  ?? [];\nconst aiFields = $('⚙️ Set — Parsed AI Fields').item.json;\n\nconst caseId  = $('📁 BEST — Create Case').item.json.case_id          ?? null;\nconst capRef  = $('set cap reference').item.json.cap_reference         ?? null;\nconst slaDate = $('📁 BEST — Create Case').item.json.sla_target_date   ?? null;\n\n// ── 3. Resolve NINO — piiData first, fallback to Set node ─────\nconst ninoValue = piiData.nino?.values?.[0] ?? aiFields.member_nino ?? null;\n\n// ── 4. Token → real value map ─────────────────────────────────\nconst tokenMap = {\n  '[MEMBER-NINO]': ninoValue,                                // ← matches prompt token\n  '[NINO]':        ninoValue,                                // ← legacy fallback\n  '[MEMBER-REF]':  piiData.memberId?.values?.[0]      ?? aiFields.member_reference ?? null,\n  '[DOB]':         piiData.dob?.values?.[0]            ?? aiFields.member_dob       ?? null,\n  '[ADDRESS]':     piiData.address?.values?.[0]        ?? aiFields.current_address  ?? null,\n  '[POSTCODE]':    piiData.postcode?.values?.[0]       ?? null,\n  '[PHONE]':       piiData.phone?.values?.[0]          ?? null,\n  '[SORT-CODE]':   piiData.sortCode?.values?.[0]       ?? null,\n  '[ACCOUNT-NO]':  piiData.accountNumber?.values?.[0]  ?? null,\n  '[CASE-REF]':    caseId,\n  '[CAP-REF]':     capRef,\n};\n\n// ── 5. Replace all tokens ─────────────────────────────────────\nfor (const [token, real] of Object.entries(tokenMap)) {\n  if (real !== null && real !== undefined) {\n    text = text.split(token).join(real);\n  }\n}\n\n// ── 6. Return ─────────────────────────────────────────────────\nreturn [{\n  json: {\n    cleaned_text: text,\n    meta: {\n      member_name:      aiFields.member_name      ?? names[0] ?? null,\n      member_nino:      ninoValue,\n      member_reference: aiFields.member_reference ?? null,\n      dob:              aiFields.member_dob        ?? null,\n      address:          aiFields.current_address   ?? null,\n      case_id:          caseId,\n      cap_reference:    capRef,\n      sla_target_date:  slaDate,\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        192
+      ],
+      "id": "d82510d4-736a-4287-ae22-6142f18dd196",
+      "name": "parse1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:5005/cap/create",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "ngrok-skip-browser-warning",
+              "value": "true"
+            },
+            {
+              "name": "Connection",
+              "value": "close"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"member_name\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.member_name }}\",\n  \"member_nino\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.member_nino }}\",\n  \"member_dob\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.member_dob }}\",\n  \"member_address\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.current_address }}\",\n  \"transaction_type\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.query_type }}\",\n  \"sender_email\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.sender_email }}\",\n  \"sender_type\":\"{{ $('⚙️ Set — Parsed AI Fields').item.json.sender_type }}\",\n  \"query_text\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.query_summary }}\"\n}",
+        "options": {}
+      },
+      "id": "acfb94ec-3ce2-410e-839c-c74ee3f8edc4",
+      "name": "📋 CAP — Create Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1232,
+        384
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:5005/best/cases",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"member_name\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.member_name }}\",\n  \"member_nino\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.member_nino }}\",\n  \"member_reference\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.member_reference }}\",\n  \"current_address\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.current_address }}\",\n  \"transaction_type\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.query_type }}\",\n  \"cap_reference\": \"{{ $json.cap_reference }}\",\n  \"sender_type\":\"{{ $('⚙️ Set — Parsed AI Fields').item.json.sender_type }}\"\n}",
+        "options": {}
+      },
+      "id": "fb374c82-9df0-4721-a0e9-3f10ad54e02b",
+      "name": "📁 BEST — Create Case",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -784,
+        384
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "leftValue": "={{ $json.address_mismatch }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "8a4bcae5-d4a3-41f5-9d4d-d82cd3b2a305",
+      "name": "🔀 Address Mismatch?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1008,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://127.0.0.1:5005/best/cases/{{case_id}}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"status\": \"PENDED\",\n  \"pended_reason\": \"{{ $('validation').item.json.mismatch_fields }}\",\n  \"pended_date\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "102175d7-5259-46f0-988f-2ac3e11ff641",
+      "name": "🔄 BEST — Set Status PENDED (no address)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1232,
+        768
+      ],
+      "retryOnFail": true,
+      "notes": "Fires on identity mismatch path (name/NINO/DOB wrong). Address was NOT the issue. Routes to identity verification letter."
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $json.member_nino }}",
+        "limit": 1,
+        "filter": {
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1008,
+        192
+      ],
+      "id": "84307349-35de-4fd9-9999-e4213ca3313e",
+      "name": "Search  folders1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.files[0].id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "7fa896bd-c934-49ae-b708-bb674d0fa851",
+      "name": "☁️ Drive — Download Latest File1",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1680,
+        288
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ai = $('⚙️ Set — Parsed AI Fields').item.json;\nconst db = $('🗄️ Supabase — Get Member by NINO').item.json;\n\nconst normaliseStr  = (s) => (s ?? '').toLowerCase().replace(/\\s+/g, ' ').trim();\nconst normaliseNino = (s) => (s ?? '').toUpperCase().replace(/\\s/g, '');\n\nconst normaliseDate = (s) => {\n  if (!s) return '';\n  const str = s.toString().trim();\n\n  // Already YYYY-MM-DD\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(str)) return str;\n\n  // DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY\n  const dmy = str.match(/^(\\d{1,2})[\\/\\-\\.](\\d{1,2})[\\/\\-\\.](\\d{4})$/);\n  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`;\n\n  // All months — full + abbreviations + edge cases\n  const months = {\n    january:'01',   february:'02',  march:'03',     april:'04',\n    may:'05',       june:'06',       july:'07',      august:'08',\n    september:'09', october:'10',   november:'11',  december:'12',\n    jan:'01', feb:'02', mar:'03', apr:'04',\n    may:'05', jun:'06', jul:'07', aug:'08',\n    sep:'09', sept:'09', oct:'10', nov:'11', dec:'12'\n  };\n\n  // \"12 June 1968\" / \"12 Jun 1968\" / \"12 September 1968\" / \"12 Sept 1968\"\n  const named = str.match(/^(\\d{1,2})\\s+([A-Za-z]+)\\s+(\\d{4})$/);\n  if (named) {\n    const month = months[named[2].toLowerCase()];\n    if (month) return `${named[3]}-${month}-${named[1].padStart(2,'0')}`;\n  }\n\n  // \"June 12, 1968\" / \"January 1, 1990\"\n  const named2 = str.match(/^([A-Za-z]+)\\s+(\\d{1,2}),?\\s+(\\d{4})$/);\n  if (named2) {\n    const month = months[named2[1].toLowerCase()];\n    if (month) return `${named2[3]}-${month}-${named2[2].padStart(2,'0')}`;\n  }\n\n  return str;\n};\n\n// Convert AI dob to YYYY-MM-DD\nconst normalisedDob = normaliseDate(ai.member_dob);\n\nconst name_match    = normaliseStr(ai.member_name)     === normaliseStr(db.member_name);\nconst dob_match     = normalisedDob                    === normaliseDate(db.member_dob);\nconst nino_match    = normaliseNino(ai.member_nino)    === normaliseNino(db.member_nino);\nconst address_match = normaliseStr(ai.current_address) === normaliseStr(db.current_address);\n\nconst all_match             = name_match && dob_match && nino_match && address_match;\nconst address_only_mismatch = !address_match && name_match && dob_match && nino_match;\nconst address_mismatch      = !address_match;\n\nconst mismatch_fields = [\n  !name_match    && 'full name',\n  !dob_match     && 'date of birth',\n  !nino_match    && 'National Insurance number',\n  !address_match && 'address',\n].filter(Boolean).join(', ');\n\nreturn [{\n  json: {\n    ...ai,\n    member_dob:            normalisedDob,\n    member_id:             db.member_id,\n    member_reference:      db.member_reference,\n    scheme_code:           db.scheme_code,\n    scheme_name:           db.scheme_name,\n    db_address:            db.current_address,\n    name_match,\n    dob_match,\n    nino_match,\n    address_match,\n    all_match,\n    mismatch_fields,\n    address_mismatch,\n    address_only_mismatch,\n  }\n}];"
+      },
+      "id": "7eba8311-8e6f-40c6-8a9b-b1efbddfff05",
+      "name": "validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f19c4c3c-eee0-4e4e-ad7d-e06ed7ceeb1e",
+              "leftValue": "={{ $json.all_match }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "6a22f5f3-a22c-43c1-82d0-a50f6c296484",
+      "name": "filelds match?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        784,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:5005/best/cases",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"member_name\": \"{{ $('validation').item.json.member_name }}\",\n  \"member_nino\": \"{{ $('validation').item.json.member_nino }}\",\n  \"member_reference\": \"{{ $('validation').item.json.member_reference }}\",\n  \"scheme_code\": \"{{ $('validation').item.json.scheme_code }}\",\n  \"transaction_type\": \"MDU\",\n  \"pended_reason\": \"ADDRESS_MISMATCH\"\n}",
+        "options": {}
+      },
+      "id": "ee857cea-7e8e-441a-93fb-06cb9398b97e",
+      "name": "🔄 BEST — Create MDU Case",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1232,
+        384
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://127.0.0.1:5005/best/cases/{{ $('📁 BEST — Create Case').item.json.case_id }}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"status\": \"PENDED\",\n  \"pended_reason\": \"{{ $('validation').item.json.mismatch_fields }}\",\n  \"pended_date\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "024ad4af-6818-45a1-b105-d7de2b372e2f",
+      "name": "🔄 BEST — Set Status PENDED",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1456,
+        384
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://127.0.0.1:5005/best/cases/{{ $('📁 BEST — Create Case').item.json.case_id }}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"member_name\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.member_name }}\",\n  \"member_nino\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.member_nino }}\",\n  \"member_reference\": \"{{ $('⚙️ Set — Parsed AI Fields').item.json.member_reference }}\",\n  \"pended_reason\": \"VERIFICATION ERROR\",\n  \"status\":\"PENDED\"\n}",
+        "options": {}
+      },
+      "id": "b6108ad2-6a4e-4934-98e0-4ab600ccec5d",
+      "name": "update as pended",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        112,
+        608
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ \"'\" + $json.id + \"' in parents and name contains '\" + $('⚙️ Set — Parsed AI Fields').item.json.query_type + \"' and trashed = false\" }}"
+            },
+            {
+              "name": "orderBy",
+              "value": "modifiedTime desc"
+            },
+            {
+              "name": "fields",
+              "value": "files(id,name,modifiedTime,mimeType)"
+            },
+            {
+              "name": "pageSize",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1232,
+        192
+      ],
+      "id": "bc4df9c3-2eb2-4ef0-9892-cc6c54cf8280",
+      "name": "get latest same query file",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b50eab35-9ac7-440f-a353-eb103d891b97",
+              "leftValue": "={{ $json.files[0].id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1456,
+        192
+      ],
+      "id": "dd393b2b-dac5-406c-8fb5-baca3176fedd",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ekYdrDZyzDXPjTMP",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/ekYdrDZyzDXPjTMP"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "cbbf9d0b-05e7-4dc1-8c08-5fc36d018df8",
+      "name": "🔁 Dispatch: LOA Rejection Letter",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        1008,
+        0
+      ],
+      "notes": "Calls Sub: Drive Upload & Gmail Dispatch. Pass: member_nino, letter_content (LOA rejection text), file_name, recipient_email (sender_email), email_subject, email_body."
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ekYdrDZyzDXPjTMP",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/ekYdrDZyzDXPjTMP"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "2b99ea7a-03bf-461c-a14b-1940deccd2f8",
+      "name": "🔁 Dispatch: Address Mismatch Letter",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        576
+      ],
+      "notes": "Calls Sub: Drive Upload & Gmail Dispatch. Pass: member_nino, address mismatch holding letter content, recipient_email."
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ekYdrDZyzDXPjTMP",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/ekYdrDZyzDXPjTMP"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "0f3d462a-2507-45e5-911b-732b3281fa05",
+      "name": "🔁 Dispatch: Identity Mismatch Letter",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        1904,
+        768
+      ],
+      "notes": "Calls Sub: Drive Upload & Gmail Dispatch. Pass: member_nino, identity mismatch holding letter content, recipient_email."
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ekYdrDZyzDXPjTMP",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/ekYdrDZyzDXPjTMP"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "277a9e71-c7be-46ed-957e-b8f4c0e98a8f",
+      "name": "🔁 Dispatch: Member Not Found Letter",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        784,
+        608
+      ],
+      "notes": "Calls Sub: Drive Upload & Gmail Dispatch. Pass: member_nino (from AI fields), not-found letter content, recipient_email."
+    },
+    {
+      "parameters": {
+        "amount": 8
+      },
+      "id": "b2b5d6fc-d825-4cda-a241-e88dda9c5a87",
+      "name": "⏳ Wait — Before Draft Letter",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2352,
+        288
+      ],
+      "webhookId": "a8dda794-acec-4121-8486-9d382c1da5be"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "0e8d24f7-65a0-4368-a301-771f6574912f",
+      "name": "⏳ Wait — Before LOA Dispatch",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        0
+      ],
+      "webhookId": "a41b90de-2fd7-49d1-8cb0-c85b81906cdb"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "c43c86ac-d0a4-41b4-baf6-f8813aa33968",
+      "name": "⏳ Wait — Before Address Dispatch",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1232,
+        576
+      ],
+      "webhookId": "92080eff-838c-4b34-8e24-a8058ab54cb3"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "71b39fdb-e61b-4cb1-963d-b0a98b5856e8",
+      "name": "⏳ Wait — Before Identity Dispatch",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1456,
+        768
+      ],
+      "webhookId": "51be822c-d05a-4564-b524-ead941aa6660"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "97e4acbd-3025-4c5c-a095-0d9848981428",
+      "name": "⏳ Wait — Before Not Found Dispatch",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        336,
+        608
+      ],
+      "webhookId": "c757db7c-e549-4e81-a116-aeb36b5d18b9"
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "id": "e02ae9cb-b86a-4c76-a078-0f49451ada78",
+      "name": "⏳ Wait — Before CAP Create",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1456,
+        384
+      ],
+      "webhookId": "fc51f68d-59e1-4c25-a79f-58a35251d73c"
+    },
+    {
+      "parameters": {},
+      "id": "febf0cf4-f093-4ae1-b908-a878884a77ac",
+      "name": "⏳ Wait — Gemini Rate Limit",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -3152,
+        480
+      ],
+      "webhookId": "1e6b8835-7e94-4587-ad69-a1e192f031ea"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=incoming masked attchment and email:{{ $('data masking').item.json.maskedText }}",
+        "options": {
+          "systemMessage": "=You are a UK pension administration specialist. Extract structured data \nfrom the email and attachments below.\n\nYour job is to analyze the email body and any attachment text.\n\nTasks:\n\n1. Identify the sender type.\nPossible values:\nMEMBER\nIFA\nIFA indicators:\n- phrases like \"my client\" or \"on behalf of\"\n- financial adviser signature\n- advisory company name\n- presence of Letter of Authority\n\n2. Extract member information from the email body and attachment.\n\n3. Determine whether the attachment is a Letter of Authority.\nA document is a Letter of Authority if it contains language authorising \na financial adviser or third party to act on behalf of a member.\n\nIMPORTANT LOA rules:\n- If ATTACHMENT TEXT is empty or blank → loa_present must be false, loa_date must be null\n- If sender_type is MEMBER → loa_present is always false regardless of attachment content\n  (members may send passports, ID documents, proof of address — these are NOT LOA)\n- If sender_type is IFA → only set loa_present to true if the attachment text explicitly \n  contains authorisation language such as:\n  \"I authorise\", \"I hereby authorise\", \"authorised to act on my behalf\", \n  \"permission to obtain\", \"act on behalf of\"\n- Do not classify ID documents, passports, or proof of address as LOA\n- loa_date is the date written on the LOA document itself, not the email date\n\n4. Categorise the type of request and set query_type accordingly.\nUse these values only:\n- \"pension\"     → general pension benefits enquiry, scheme details, \n                  preserved benefits, start/leaving dates, pension value\n- \"transfer\"    → transfer value quotation or request to move pension \n                  to another provider\n- \"retirement\"  → member wants to take or start drawing their pension, \n                  retirement options or quotes\n- \"death\"       → bereavement case, death benefit claim, notification \n                  of member death\n- \"data-update\" → request to update member personal details such as \n                  address, name, bank details or contact information\n\nReturn ONLY a valid JSON object — no markdown, no explanation, \nno code fences.\n\n{\n  \"member_name\": \"Full legal name or null\",\n  \"member_nino\": \"NI number format XX000000X normalised uppercase no spaces, or null\",\n  \"member_reference\": \"Scheme member reference or null\",\n  \"member_dob\": \"YYYY-MM-DD or null\",\n  \"current_address\": \"Full address as single string or null\",\n  \"sender_type\": \"MEMBER or IFA\",\n  \"query_type\": \"pension | transfer | retirement | death | data-update\",\n  \"query_summary\": \"One sentence describing the request\",\n  \"loa_present\": true or false,\n  \"loa_date\": \"YYYY-MM-DD date on LOA document or null\"\n}",
+          "maxIterations": 3
+        }
+      },
+      "id": "9458a657-f817-473c-8ac7-5c219e0ee8ce",
+      "name": "🤖 AI — Extract & Classify",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -2928,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// PARSE + UNMASK + FALLBACK (PRODUCTION READY)\n// ============================================================\n\n// ── 1. Get AI raw output ─────────────────────────────────────\nconst raw = $json.output ?? '';\n\n// Remove markdown/code fences\nlet text = raw\n  .replace(/```json/gi, '')\n  .replace(/```/g, '')\n  .trim();\n\n// Extract JSON block\nconst match = text.match(/\\{[\\s\\S]*\\}/);\nif (!match) throw new Error('No JSON object found in AI output');\n\nlet parsed;\ntry {\n  parsed = JSON.parse(match[0]);\n} catch (err) {\n  throw new Error('Invalid JSON: ' + err.message);\n}\n\n// ── 2. Get PII data from masking node ────────────────────────\nconst piiData       = $('data masking').item.json.piiData      ?? {};\nconst detectedNames = $('data masking').item.json.detectedNames ?? [];\n\n// ── 3. Helper: Resolve value (CRITICAL FIX) ──────────────────\nfunction resolve(value, fallback) {\n  if (!value) return fallback ?? null;\n\n  if (typeof value === 'string') {\n    const v = value.trim();\n\n    // Treat these as invalid → fallback\n    if (\n      v === '' ||\n      v.toLowerCase() === 'null' ||\n      v.includes('[')   // catches [DOB], [ADDRESS], etc.\n    ) {\n      return fallback ?? null;\n    }\n  }\n\n  return value;\n}\n\n// ── 4. Build final cleaned result ────────────────────────────\nconst result = {};\n\n// Basic fields\nresult.member_name = resolve(\n  parsed.member_name,\n  detectedNames[0] ?? null\n);\n\nresult.member_nino = resolve(\n  parsed.member_nino,\n  piiData.nino?.values?.[0]\n);\n\nresult.member_reference = resolve(\n  parsed.member_reference,\n  piiData.memberId?.values?.[0]\n);\n\nresult.member_dob = resolve(\n  parsed.member_dob,\n  piiData.dob?.values?.[0]\n);\n\nresult.current_address = resolve(\n  parsed.current_address,\n  piiData.address?.values?.[0]\n);\n\n// Classification fields (no fallback needed usually)\nresult.sender_type   = parsed.sender_type ?? null;\nresult.query_type    = parsed.query_type ?? null;\nresult.query_summary = parsed.query_summary ?? null;\n\n// LOA fields\nresult.loa_present = parsed.loa_present ?? false;\nresult.loa_date    = parsed.loa_date ?? null;\n\n// ── 5. Return final output ───────────────────────────────────\nreturn [{\n  json: result\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2576,
+        480
+      ],
+      "id": "04df79b9-3a39-494e-9fe3-5cdad71f5094",
+      "name": "parse"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ff19e6dc-eb97-423a-844f-1c580341d435",
+              "name": "member_name",
+              "type": "string",
+              "value": "={{ $json.member_name }}"
+            },
+            {
+              "id": "d1881f64-0aa1-4b07-85f0-c7903629d13b",
+              "name": "member_nino",
+              "type": "string",
+              "value": "={{ $json.member_nino }}"
+            },
+            {
+              "id": "9ec55b54-d658-49f6-8a98-1487dbbcb672",
+              "name": "member_reference",
+              "type": "string",
+              "value": "={{ $json.member_reference }}"
+            },
+            {
+              "id": "ba15db7e-bd5b-49bb-98b5-2288ff5074da",
+              "name": "member_dob",
+              "type": "string",
+              "value": "={{ $json.member_dob }}"
+            },
+            {
+              "id": "82a34f38-f8eb-4327-99de-7c0e5c460ae3",
+              "name": "current_address",
+              "type": "string",
+              "value": "={{ $json.current_address }}"
+            },
+            {
+              "id": "e3688801-7fd9-475c-b59f-4c6959962e97",
+              "name": "sender_type",
+              "type": "string",
+              "value": "={{ $json.sender_type }}"
+            },
+            {
+              "id": "cff6754d-3610-4ede-b930-73d517f01e3c",
+              "name": "query_type",
+              "type": "string",
+              "value": "={{ $json.query_type }}"
+            },
+            {
+              "id": "cc0f95c5-e496-4f09-92df-8961a8f0f5b2",
+              "name": "query_summary",
+              "type": "string",
+              "value": "={{ $json.query_summary }}"
+            },
+            {
+              "id": "76787aba-41ff-478d-bc3e-d1d15a1ec88c",
+              "name": "loa_present",
+              "type": "boolean",
+              "value": "={{ $json.loa_present }}"
+            },
+            {
+              "id": "0f13931e-bae7-434d-aced-e4c5cd2cc9b7",
+              "name": "loa_date",
+              "type": "string",
+              "value": "={{ $json.loa_date }}"
+            },
+            {
+              "id": "a93ce7bf-f6b1-4c98-8f4c-10bebb029d9c",
+              "name": "sender_email",
+              "type": "string",
+              "value": "={{ $('📥 Normalise Input').item.json.from_address }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7cdb9ce3-fbc3-4e13-bf44-8fdee0351660",
+      "name": "⚙️ Set — Parsed AI Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1904,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fea216bd-65cc-474b-9a7d-4a0ea86cb146",
+              "name": "member_nino",
+              "type": "string",
+              "value": "={{$('⚙️ Set — Parsed AI Fields').item.json.member_nino}}"
+            },
+            {
+              "id": "6750af3f-6775-4e68-a059-42ede6d0831e",
+              "name": "letter_content",
+              "type": "string",
+              "value": "=PensionCo Administration\nDate: {{ $now.toFormat(\"d MMMM yyyy\")}}\n\n{{$('⚙️ Set — Parsed AI Fields').item.json.member_name}} \n{{$('⚙️ Set — Parsed AI Fields').item.json.current_address}} \n\nDear {{$('⚙️ Set — Parsed AI Fields').item.json.member_name}} ,\n\nRe: Pension Enquiry — Case Reference {{$('📁 BEST — Create Case').item.json.case_id}} — Letter of Authority Required\n\nThank you for contacting PensionCo Administration on behalf of your client.\n\nUnfortunately we are unable to process your request as the Letter of Authority provided is either missing or has expired. A valid Letter of Authority dated within the last 12 months must accompany all requests made on behalf of a pension member.\n\nPlease resubmit your request with a current Letter of Authority.\n\nYours sincerely,\nPensionCo Administration"
+            },
+            {
+              "id": "b9c83220-ef2b-41d4-8234-db0a9a2ef5f4",
+              "name": "file_name",
+              "type": "string",
+              "value": "={{$('📁 BEST — Create Case').item.json.case_id}}_LOA_REJECTION_{{ $now.toFormat(\"yyyyMMdd\")}}.txt"
+            },
+            {
+              "id": "3fc19743-a2a8-4f02-bb5f-566e96f469f7",
+              "name": "recipient_email",
+              "type": "string",
+              "value": "={{$('⚙️ Set — Parsed AI Fields').item.json.sender_email}}"
+            },
+            {
+              "id": "ee5c63df-d1d3-4123-82cb-2ef924883922",
+              "name": "email_subject",
+              "type": "string",
+              "value": "=Letter of Authority — Action Required — Case {{$('📁 BEST — Create Case').item.json.case_id}}"
+            },
+            {
+              "id": "2391cdfc-b6d3-443c-9161-ae5f6956184b",
+              "name": "email_body",
+              "type": "string",
+              "value": "=Dear {{$('⚙️ Set — Parsed AI Fields').item.json.member_name}} ,\n\nThank you for contacting PensionCo Administration.\n\nWe are unable to process your request as the Letter of Authority is missing or expired.\n\nCase Reference: {{$('📁 BEST — Create Case').item.json.case_id}}\n\nPlease find our formal response attached.\n\nYours sincerely,\nPensionCo Administration"
+            },
+            {
+              "id": "2abf0809-4506-479d-9530-b742c5855b39",
+              "name": "sender_type",
+              "value": "={{ $('parse').item.json.sender_type }}",
+              "type": "string"
+            },
+            {
+              "id": "95e33082-ab31-41e8-94e7-0389f93fc7fb",
+              "name": "query_type",
+              "value": "={{ $('parse').item.json.query_type }}",
+              "type": "string"
+            },
+            {
+              "id": "4e671440-2456-42f4-860b-c894c45fedfb",
+              "name": "cap_reference",
+              "value": "={{ $('set cap reference').item.json.cap_reference ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "2117b7a2-5dec-484b-b82b-017fef11dce4",
+              "name": "case_id",
+              "value": "={{ $('📁 BEST — Create Case').item.json.case_id ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "fbe1af4d-a9c2-442a-bd02-79f25a020cc5",
+              "name": "processing_time_ms",
+              "value": "={{ Date.now() - ($('📥 Normalise Input').item.json.start_time ?? Date.now()) }}",
+              "type": "string"
+            },
+            {
+              "id": "b659a437-604c-4557-8885-8deb1552c766",
+              "name": "session_id",
+              "value": "={{ $('📥 Normalise Input').item.json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "04ef2fa8-43ae-48f4-bd5b-a578fa5aa375",
+              "name": "trigger_source",
+              "value": "={{ $('📥 Normalise Input').item.json.trigger_source }}",
+              "type": "string"
+            },
+            {
+              "id": "1262c756-9daf-43d3-a992-e18a93037204",
+              "name": "step_name",
+              "value": "LOA Rejection Letter Sent",
+              "type": "string"
+            },
+            {
+              "id": "19eb30ac-3f9f-473a-bab3-615ee97e6588",
+              "name": "step_detail",
+              "value": "Case pended — Letter of Authority invalid or missing",
+              "type": "string"
+            },
+            {
+              "id": "5c8266af-a0d5-4d1e-a1bb-763548b0544a",
+              "name": "outcome",
+              "value": "pended_loa_invalid",
+              "type": "string"
+            },
+            {
+              "id": "6533f4cf-6e07-4a03-934d-ec927397a94e",
+              "name": "best_status",
+              "value": "CLOSED",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0c441f72-1878-4c60-831c-40102fbb6d95",
+      "name": "📦 Prepare — LOA Rejection",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        784,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6b7d2bc6-911c-4770-8991-aee3f4875323",
+              "name": "member_nino",
+              "type": "string",
+              "value": "={{$('validation').item.json.member_nino}}"
+            },
+            {
+              "id": "e16b0304-958b-4fae-9e59-9d51603840df",
+              "name": "letter_content",
+              "type": "string",
+              "value": "=PensionCo Administration\nDate: {{ $now.toFormat(\"d MMMM yyyy\")}}\n\n{{$('validation').item.json.member_name}} \n\nDear {{$('validation').item.json.member_name}} ,\n\nRe: Pension Enquiry — Case Reference {{$('📁 BEST — Create Case').item.json.case_id}} — Identity Verification Required\n\nThank you for contacting PensionCo Administration.\n\nWe have been unable to verify the following details against our records: {{$('validation').item.json.mismatch_fields}} .\n\nPlease provide certified proof of identity so we can verify your details and proceed with your enquiry.\n\nYours sincerely,\nPensionCo Administration"
+            },
+            {
+              "id": "620bc3d4-aff3-4bd4-935f-6dda59491bc4",
+              "name": "file_name",
+              "type": "string",
+              "value": "={{$('📁 BEST — Create Case').item.json.case_id}}_IDENTITY_MISMATCH_{{ $now.toFormat(\"yyyyMMdd\")}}.txt"
+            },
+            {
+              "id": "5018ba43-f3f1-410e-9d1c-0ecdc751ed1a",
+              "name": "recipient_email",
+              "type": "string",
+              "value": "={{$('validation').item.json.sender_email}}"
+            },
+            {
+              "id": "23002cc5-df86-463d-a86a-9ebe656dec8a",
+              "name": "email_subject",
+              "type": "string",
+              "value": "=Action Required — Identity Verification — Case {{$('📁 BEST — Create Case').item.json.case_id}}"
+            },
+            {
+              "id": "540daafe-0fc4-4a4b-9253-09ddd5067ecf",
+              "name": "email_body",
+              "type": "string",
+              "value": "=Dear {{$('validation').item.json.member_name}} ,\n\nCase Reference: {{$('📁 BEST — Create Case').item.json.case_id}}\n\nWe require identity verification to proceed. Mismatched fields: {{$('validation').item.json.mismatch_fields}} .\n\nPlease see the attached letter for details.\n\nYours sincerely,\nPensionCo Administration"
+            },
+            {
+              "id": "26d78617-7d4d-4093-b78f-a0619c212025",
+              "name": "trigger_source",
+              "value": "={{ $('📥 Normalise Input').item.json.trigger_source }}",
+              "type": "string"
+            },
+            {
+              "id": "4c7655f6-e269-47e1-9790-5638b2705358",
+              "name": "session_id",
+              "value": "={{ $('📥 Normalise Input').item.json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "e9924da9-3237-4b41-b198-94b28e6aa565",
+              "name": "sender_type",
+              "value": "={{ $('parse').item.json.sender_type }}",
+              "type": "string"
+            },
+            {
+              "id": "ebd340fe-c8d2-4e6e-8160-6a8191d844b8",
+              "name": "query_type",
+              "value": "={{ $('parse').item.json.query_type }}",
+              "type": "string"
+            },
+            {
+              "id": "1db400d5-fbf6-4ad3-9751-b99b6f8e2727",
+              "name": "cap_reference",
+              "value": "={{ $('set cap reference').item.json.cap_reference ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "9eb62dee-40d6-4dc7-af41-ca6da82259a5",
+              "name": "case_id",
+              "value": "={{ $('📁 BEST — Create Case').item.json.case_id ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "5a735a91-89d7-4cf4-bd4e-0e693605843b",
+              "name": "processing_time_ms",
+              "value": "={{ Date.now() - ($('📥 Normalise Input').item.json.start_time ?? Date.now()) }}",
+              "type": "string"
+            },
+            {
+              "id": "458da5a3-29d3-4303-8905-940b2339098a",
+              "name": "step_name",
+              "value": "Identity Mismatch Letter Sent",
+              "type": "string"
+            },
+            {
+              "id": "3563e222-e446-4172-8782-e4033a8cb79f",
+              "name": "step_detail",
+              "value": "Case pended — identity verification required",
+              "type": "string"
+            },
+            {
+              "id": "f725c0e1-47fc-4b58-81c4-bfbfdeef6346",
+              "name": "outcome",
+              "value": "pended_identity_mismatch",
+              "type": "string"
+            },
+            {
+              "id": "68529e77-8341-4c7f-877a-b75bf39e7540",
+              "name": "best_status",
+              "value": "PENDED",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9997bfa5-04a0-4ce4-984c-a9a28d3f9dbd",
+      "name": "📦 Prepare — Identity Mismatch",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1680,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d8895d48-5c32-4921-a4c1-2ee557a5da6b",
+              "name": "member_nino",
+              "type": "string",
+              "value": "={{$('⚙️ Set — Parsed AI Fields').item.json.member_nino}}"
+            },
+            {
+              "id": "6389822c-281b-4b41-8c1f-5669cc033d34",
+              "name": "letter_content",
+              "type": "string",
+              "value": "=PensionCo Administration\nDate: {{ $now.toFormat(\"d MMMM yyyy\")}}\n\nDear {{$('⚙️ Set — Parsed AI Fields').item.json.member_name}} ,\n\nRe: Pension Enquiry — Case Reference {{$('📁 BEST — Create Case').item.json.case_id}}\n\nThank you for contacting PensionCo Administration.\n\nWe have been unable to locate your membership record using the details provided. Please ensure your National Insurance number and personal details are correct and resubmit your enquiry.\n\nYours sincerely,\nPensionCo Administration"
+            },
+            {
+              "id": "50f60102-0d9a-4645-977b-33896a41e576",
+              "name": "file_name",
+              "type": "string",
+              "value": "={{$('📁 BEST — Create Case').item.json.case_id}}_MEMBER_NOT_FOUND_{{ $now.toFormat(\"yyyyMMdd\")}}.txt"
+            },
+            {
+              "id": "de502856-0113-436c-9794-a74b75751557",
+              "name": "recipient_email",
+              "type": "string",
+              "value": "={{$('⚙️ Set — Parsed AI Fields').item.json.sender_email}}"
+            },
+            {
+              "id": "f1e2a212-d01c-488a-8091-8527f3ff43b9",
+              "name": "email_subject",
+              "type": "string",
+              "value": "=Action Required — Membership Verification — Case {{$('📁 BEST — Create Case').item.json.case_id}}"
+            },
+            {
+              "id": "94d8101a-aafe-42b3-9667-14be0f868b80",
+              "name": "email_body",
+              "type": "string",
+              "value": "=Dear {{$('⚙️ Set — Parsed AI Fields').item.json.member_name}} ,\n\nCase Reference: {{$('📁 BEST — Create Case').item.json.case_id}}\n\nWe were unable to locate your membership record. Please see the attached letter for next steps.\n\nYours sincerely,\nPensionCo Administration"
+            },
+            {
+              "id": "e15582be-2f2f-4c11-9957-b084a20c26c6",
+              "name": "session_id",
+              "value": "={{ $('📥 Normalise Input').item.json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "301012a5-d966-494b-8e40-30144762a330",
+              "name": "trigger_source",
+              "value": "={{ $('📥 Normalise Input').item.json.trigger_source }}",
+              "type": "string"
+            },
+            {
+              "id": "2d534bdf-fbde-4410-9605-cf2b33ee480f",
+              "name": "sender_type",
+              "value": "={{ $('parse').item.json.sender_type }}",
+              "type": "string"
+            },
+            {
+              "id": "349d1cac-f262-4d89-8a40-56bd4e761b1e",
+              "name": "query_type",
+              "value": "={{ $('parse').item.json.query_type }}",
+              "type": "string"
+            },
+            {
+              "id": "e855d0a5-80c9-4e35-a9dc-6d1088447991",
+              "name": "cap_reference",
+              "value": "={{ $('set cap reference').item.json.cap_reference ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "b2a40c65-2146-470c-a0f1-aef2b25977a7",
+              "name": "case_id",
+              "value": "={{ $('📁 BEST — Create Case').item.json.case_id ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "798194e0-9d09-4733-9386-2c5ec57f4d7d",
+              "name": "processing_time_ms",
+              "value": "={{ Date.now() - ($('📥 Normalise Input').item.json.start_time ?? Date.now()) }}",
+              "type": "string"
+            },
+            {
+              "id": "b41f9acc-9cfe-47cf-8a1c-4b038fe14d7a",
+              "name": "step_name",
+              "value": "Member Not Found Letter Sent",
+              "type": "string"
+            },
+            {
+              "id": "a8c4701a-10fe-4bcb-8e08-031e3e3b667c",
+              "name": "step_detail",
+              "value": "Case pended — member not found in syste",
+              "type": "string"
+            },
+            {
+              "id": "7b552d0f-72f2-483d-9e34-3857d751565a",
+              "name": "outcome",
+              "value": "pended_member_not_found",
+              "type": "string"
+            },
+            {
+              "id": "215d5d27-5996-41f7-bd4e-ffc086e1507b",
+              "name": "best_status",
+              "value": "PENDED",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f4d98335-b01b-4aee-add6-edaae17af1ae",
+      "name": "📦 Prepare — Member Not Found",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── AI Confidence Check ─────────────────────────────────────────────────────\n// Checks whether the AI extraction has enough data to proceed automatically.\n// Low confidence = key fields missing. Route to human checker queue.\n// High confidence = continue to normal processing.\n\nconst ai = $input.first().json;\n\nconst hasName  = ai.member_name  && ai.member_name.trim()  !== '' && ai.member_name  !== 'null';\nconst hasNino  = ai.member_nino  && ai.member_nino.trim()  !== '' && ai.member_nino  !== 'null';\nconst hasDob   = ai.member_dob   && ai.member_dob.trim()   !== '' && ai.member_dob   !== 'null';\nconst hasQuery = ai.query_type   && ai.query_type.trim()   !== '' && ai.query_type   !== 'null' && ai.query_type !== 'unknown';\n\n// Score: count how many key fields were extracted\nconst fieldScore = [hasName, hasNino, hasDob, hasQuery].filter(Boolean).length;\n\n// Confidence threshold: 3 out of 4 key fields must be present to auto-process\n// If less than 3 → low confidence → route to human checker\nconst confidence_pass = fieldScore >= 3;\n\nconst missing_fields = [\n  !hasName  && 'member_name',\n  !hasNino  && 'member_nino',\n  !hasDob   && 'member_dob',\n  !hasQuery && 'query_type',\n].filter(Boolean).join(', ');\n\nreturn [{\n  json: {\n    ...ai,\n    confidence_pass,\n    confidence_score: fieldScore,\n    confidence_missing: missing_fields || 'none',\n  }\n}];"
+      },
+      "id": "83ccc0d2-28b4-4691-86cc-77674b81f7a6",
+      "name": "⚙️ AI — Confidence Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2352,
+        480
+      ],
+      "notes": "Checks AI extraction quality. fieldScore >= 3 of 4 key fields = high confidence → auto process. fieldScore < 3 = low confidence → route to human checker queue with case pended as AI_LOW_CONFIDENCE."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "82832e58-217a-484c-a0f1-e53a262e5240",
+              "leftValue": "={{ $json.confidence_pass }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "70ab7819-5975-4251-871b-d1fe4ca309a1",
+      "name": "🔀 Confidence Pass?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2128,
+        480
+      ],
+      "notes": "TRUE (score >= 3) → continue to Set Parsed AI Fields → normal processing. FALSE (score < 2) → prepare low confidence pend → dispatch holding letter and pend case with AI_LOW_CONFIDENCE reason."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f2c70463-9ca6-4fb1-936c-da31cdfa3a81",
+              "name": "member_nino",
+              "type": "string",
+              "value": "={{ $json.member_nino ?? 'UNKNOWN' }}"
+            },
+            {
+              "id": "ebc176a9-409e-4422-8de2-2c74d520b4a1",
+              "name": "letter_content",
+              "type": "string",
+              "value": "=PensionCo Administration\nDate: {{ $now.toFormat('d MMMM yyyy') }}\n\n{{ $json.member_name ?? 'Member' }}\n\nDear {{ $json.member_name ?? 'Member' }},\n\nRe: Pension Enquiry — Further Information Required\n\nThank you for contacting PensionCo Administration.\n\nWe have received your enquiry but were unable to automatically identify your membership record from the details provided. To proceed, please resubmit your enquiry with the following information:\n\n- Full legal name (as held on your pension record)\n- National Insurance number\n- Date of birth\n- Pension scheme reference number (if known)\n\nThis will allow us to locate your record and process your request promptly.\n\nYours sincerely,\nPensionCo Administration"
+            },
+            {
+              "id": "9422a5f9-7b29-427b-94d5-c7f9237af0f1",
+              "name": "file_name",
+              "type": "string",
+              "value": "=AI_LOW_CONFIDENCE_{{ $now.toFormat('yyyyMMdd_HHmmss') }}.txt"
+            },
+            {
+              "id": "0eac260e-060d-4e3c-8d80-bfd6c49a8215",
+              "name": "recipient_email",
+              "type": "string",
+              "value": "={{ $('📥 Normalise Input').item.json.from_address }}"
+            },
+            {
+              "id": "c9904581-6113-4b21-8729-880de74fc44b",
+              "name": "email_subject",
+              "type": "string",
+              "value": "=Your Pension Enquiry — Further Information Required"
+            },
+            {
+              "id": "63881954-6744-45aa-9560-37f8f0d1dc0e",
+              "name": "email_body",
+              "type": "string",
+              "value": "=Dear {{ $json.member_name ?? 'Member' }},\n\nThank you for your enquiry. We were unable to locate your membership record from the details provided.\n\nPlease see the attached letter for details of the information we require to process your request.\n\nPensionCo Administration"
+            },
+            {
+              "id": "71d8aa06-0d8f-4fb5-997f-480332396c07",
+              "name": "pended_reason",
+              "type": "string",
+              "value": "=AI_LOW_CONFIDENCE — missing fields: {{ $json.confidence_missing }}"
+            },
+            {
+              "id": "b81a21d3-3493-434b-b657-48aca6312b70",
+              "name": "session_id",
+              "value": "={{ $('📥 Normalise Input').item.json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "6c470ec5-f784-42b7-8979-7b89402a3d02",
+              "name": "trigger_source",
+              "value": "={{ $('📥 Normalise Input').item.json.trigger_source }}",
+              "type": "string"
+            },
+            {
+              "id": "01d982c2-3081-4ad5-84d1-25ffff59a89d",
+              "name": "sender_type",
+              "value": "={{ $('parse').item.json.sender_type }}",
+              "type": "string"
+            },
+            {
+              "id": "73ebb327-2111-4c6b-832a-cdcd87f9bd39",
+              "name": "query_type",
+              "value": "={{ $('parse').item.json.query_type }}",
+              "type": "string"
+            },
+            {
+              "id": "4ede44d1-6a97-4289-b24f-d829b7d2cba4",
+              "name": "processing_time_ms",
+              "value": "={{ Date.now() - ($('📥 Normalise Input').item.json.start_time ?? Date.now()) }}",
+              "type": "string"
+            },
+            {
+              "id": "cc19e790-1e99-49fa-97e6-33c4a570c916",
+              "name": "step_detail",
+              "value": "Case pended — AI confidence too low",
+              "type": "string"
+            },
+            {
+              "id": "cf72d41e-52b1-4bcd-a443-71c645d742c7",
+              "name": "step_name",
+              "value": "Low Confidence Letter Sent",
+              "type": "string"
+            },
+            {
+              "id": "402b440e-73be-4b21-9a63-4cfbee02830f",
+              "name": "outcome",
+              "value": "pended_low_confidence",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "587e0aba-0bcb-4f9a-be22-4404e636d5ac",
+      "name": "📦 Prepare — Low Confidence",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1904,
+        576
+      ],
+      "notes": "Prepares the low-confidence holding letter. member_nino defaults to UNKNOWN if not extracted. Uses sender_email from Gmail trigger. pended_reason records which fields were missing for audit trail."
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ekYdrDZyzDXPjTMP",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/ekYdrDZyzDXPjTMP"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "082963e5-403f-430d-be2f-338d518f873b",
+      "name": "🔁 Dispatch: Low Confidence Letter",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        -1680,
+        576
+      ],
+      "notes": "Sends holding letter to enquirer asking them to resubmit with correct details. Uses same reusable Drive + Gmail sub-workflow as all other letter dispatch nodes."
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Read from Normalise Input ─────────────────────────────────\nconst subject = $('📥 Normalise Input').item.json.subject ?? '';\nlet body = $('📥 Normalise Input').item.json.text ?? '';\nlet attachmentText = $('📥 Normalise Input').item.json.attachment_text ?? '';\n\n// ── Strip reply formatting ────────────────────────────────────\nfunction stripFormatting(t) {\n  return t\n    .replace(/\\*\\*([^*]+)\\*\\*/g, '$1')\n    .replace(/\\*([^*\\n]+)\\*/g, '$1')\n    .replace(/^>\\s*/gm, '')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/  +/g, ' ')\n    .trim();\n}\nbody = stripFormatting(body);\nattachmentText = stripFormatting(attachmentText);\n\nconst emailText = `SUBJECT: ${subject}\\n\\nBODY:\\n${body}`;\nconst fullWithAttachment = attachmentText\n  ? `${emailText}\\n\\nATTACHMENT:\\n${attachmentText}`\n  : emailText;\n\nlet masked = fullWithAttachment;\nconst piiData = {};\n\nfunction register(key, label, values) {\n  const clean = [...new Set(values.map(v => v.trim()).filter(Boolean))];\n  if (clean.length === 0) return;\n  if (!piiData[key]) piiData[key] = { label, values: [] };\n  piiData[key].values = [...new Set([...piiData[key].values, ...clean])];\n}\n\n// ── Extract names BEFORE masking ─────────────────────────────\nconst namesFound = [];\nconst labelledNameRx = /(?:member\\s*name|client\\s*name|policyholder|claimant)\\s*[:\\-]?\\s*([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)+)/gi;\nlet nm;\nwhile ((nm = labelledNameRx.exec(fullWithAttachment)) !== null) {\n  if (nm[1]) namesFound.push(nm[1].trim());\n}\nconst titledRx = /\\b(Mr|Mrs|Ms|Miss|Dr|Prof)\\.?\\s+[A-Z][a-z]+(?:\\s+[A-Z][a-z]+)+/g;\nlet tn;\nwhile ((tn = titledRx.exec(fullWithAttachment)) !== null) {\n  namesFound.push(tn[0].trim());\n}\nconst uniqueNames = [...new Set(namesFound)];\n\n// ── LABELLED patterns only (key:value masking) ────────────────\nconst labelledPatterns = [\n  {\n    key: 'nino', label: 'National Insurance Number', token: 'NINO',\n    regex: /(?:national\\s*insurance\\s*(?:number)?|ni(?:no)?(?:\\s*(?:number|no))?|n\\.i\\.(?:\\s*(?:number|no))?)\\s*[:\\-#]?\\s*([A-Z]{2}\\s?\\d{2}\\s?\\d{2}\\s?\\d{2}\\s?[A-D])/gi,\n  },\n  {\n    key: 'dob', label: 'Date of Birth', token: 'DOB',\n    regex: /(?:date\\s*of\\s*birth|d\\.?o\\.?b\\.?|birth\\s*date|born\\s*[:\\-])\\s*(\\d{1,2}\\s+[A-Za-z]+\\s+\\d{4}|\\d{1,2}[\\/\\-]\\d{1,2}[\\/\\-]\\d{4})/gi,\n  },\n  {\n    key: 'memberId', label: 'Member Reference', token: 'MEMBER-REF',\n    regex: /(?:member\\s*ref(?:erence)?|mem(?:\\s*ref|\\s*id|id)|member\\s*id|policy(?:\\s*no)?|scheme\\s*ref)\\s*[:\\-#]?\\s*([A-Z0-9][\\w\\-\\/]{3,25})/gi,\n  },\n  {\n    key: 'address', label: 'Address', token: 'ADDRESS',\n    regex: /(?:(?:home|correspondence|postal|mailing)?\\s*address)\\s*[:\\-]?\\s*(.+?)(?=\\n|$)/gi,\n  },\n  {\n    key: 'phone', label: 'Phone Number', token: 'PHONE',\n    regex: /(?:phone|telephone|tel|mobile|mob|contact\\s*(?:number)?)\\s*[:\\-]?\\s*((?:\\+44\\s?|0)[\\d\\s\\-\\(\\)]{9,15})/gi,\n  },\n  {\n    key: 'postcode', label: 'UK Postcode', token: 'POSTCODE',\n    regex: /(?:post\\s*code|postal\\s*code)\\s*[:\\-]?\\s*([A-Z]{1,2}\\d[A-Z\\d]?\\s?\\d[A-Z]{2})/gi,\n  },\n  {\n    key: 'sortCode', label: 'Sort Code', token: 'SORT-CODE',\n    regex: /(?:sort\\s*code)\\s*[:\\-]?\\s*(\\d{2}[\\s\\-]\\d{2}[\\s\\-]\\d{2})/gi,\n  },\n  {\n    key: 'accountNumber', label: 'Account Number', token: 'ACCOUNT-NO',\n    regex: /(?:account\\s*(?:number|no)?)\\s*[:\\-]?\\s*(\\d{8})/gi,\n  },\n];\n\nfor (const p of labelledPatterns) {\n  const rx = new RegExp(p.regex.source, p.regex.flags);\n  let match;\n  const found = [];\n  while ((match = rx.exec(masked)) !== null) {\n    if (match[1]) found.push(match[1].trim());\n  }\n  register(p.key, p.label, found);\n  masked = masked.replace(\n    new RegExp(p.regex.source, p.regex.flags),\n    (full, captured) => full.replace(captured, `[${p.token}]`)\n  );\n}\n\n// ── PII summary ───────────────────────────────────────────────\nconst summaryLines = [];\nif (uniqueNames.length > 0) {\n  summaryLines.push(`Member Name [visible]: ${uniqueNames.join(' | ')}`);\n}\nfor (const [, entry] of Object.entries(piiData)) {\n  summaryLines.push(`${entry.label}: ${entry.values.join(' | ')}`);\n}\nconst piiSummary = summaryLines.length > 0 ? summaryLines.join('\\n') : 'No PII detected';\n\n// ── Build content field ───────────────────────────────────────\nconst cleanSubject = subject.replace(/^Subject:\\s*/i, '').trim();\nconst content = cleanSubject + '\\n\\n' + body + (attachmentText ? '\\n\\nATTACHMENT:\\n' + attachmentText : '');\n\nreturn [{\n  json: {\n    maskedText: masked,\n    piiData,\n    piiSummary,\n    detectedNames: uniqueNames,\n    originalSubject: subject,\n    originalBody: body,\n    email_subject: cleanSubject,\n    email_body: body,\n    attachment_text: attachmentText,\n    content: content\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3376,
+        480
+      ],
+      "id": "f3fb2737-82db-4274-80c5-c6dc3da75ecc",
+      "name": "data masking"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// MASK PREVIOUS CORRESPONDENCE\n// Masks PII in the previous letter text before sending to AI\n// Also outputs tokenMap so unmask node can reverse it\n// ============================================================\n\n// ── 1. Get the previous correspondence text ──────────────────\nconst prevText = $json.data ?? '';\n\n// ── 2. Pull real PII from \"data masking\" node ─────────────────\nconst piiData       = $('data masking').item.json.piiData      ?? {};\nconst detectedNames = $('data masking').item.json.detectedNames ?? [];\n\n// ── 3. Build real value → token map ───────────────────────────\nconst replaceMap = [];\n\nif (piiData.memberId?.values?.[0])\n  replaceMap.push({ val: piiData.memberId.values[0],      token: '[MEMBER-REF]' });\n\nif (piiData.dob?.values?.[0])\n  replaceMap.push({ val: piiData.dob.values[0],           token: '[DOB]' });\n\nif (piiData.address?.values?.[0])\n  replaceMap.push({ val: piiData.address.values[0],       token: '[ADDRESS]' });\n\nif (piiData.postcode?.values?.[0])\n  replaceMap.push({ val: piiData.postcode.values[0],      token: '[POSTCODE]' });\n\nif (piiData.phone?.values?.[0])\n  replaceMap.push({ val: piiData.phone.values[0],         token: '[PHONE]' });\n\nif (piiData.nino?.values?.[0])\n  replaceMap.push({ val: piiData.nino.values[0],          token: '[NINO]' });\n\nif (piiData.sortCode?.values?.[0])\n  replaceMap.push({ val: piiData.sortCode.values[0],      token: '[SORT-CODE]' });\n\nif (piiData.accountNumber?.values?.[0])\n  replaceMap.push({ val: piiData.accountNumber.values[0], token: '[ACCOUNT-NO]' });\n\n// ── 4. Apply masking ──────────────────────────────────────────\nlet maskedPrev = prevText;\n\nfor (const { val, token } of replaceMap) {\n  const escaped = val.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n  maskedPrev = maskedPrev.replace(new RegExp(escaped, 'gi'), token);\n}\n\n// ── 5. Raw pattern fallbacks ──────────────────────────────────\nmaskedPrev = maskedPrev.replace(\n  /\\b([A-CEGHJ-PR-TW-Z][A-CEGHJ-NPR-TW-Z]\\s?\\d{2}\\s?\\d{2}\\s?\\d{2}\\s?[A-D])\\b/gi,\n  '[NINO]'\n);\nmaskedPrev = maskedPrev.replace(\n  /\\b([A-Z]{1,2}\\d[A-Z\\d]?\\s?\\d[A-Z]{2})\\b/gi,\n  '[POSTCODE]'\n);\nmaskedPrev = maskedPrev.replace(\n  /\\b(\\d{1,2}[\\/\\-\\.]\\d{1,2}[\\/\\-\\.]\\d{4})\\b/g,\n  '[DOB]'\n);\nmaskedPrev = maskedPrev.replace(\n  /\\b([A-Z]{2,6}[-\\/]\\d{4}[-\\/]\\d{3,8})\\b/gi,\n  '[MEMBER-REF]'\n);\nmaskedPrev = maskedPrev.replace(\n  /\\b(PCS-[A-Z]+-[A-Z0-9]+)\\b/gi,\n  '[CASE-REF]'\n);\nmaskedPrev = maskedPrev.replace(\n  /(\\+44\\s?7\\d{3}|\\(?07\\d{3}\\)?|\\b0[12]\\d{3})\\s?\\d{3}\\s?\\d{3,4}/g,\n  '[PHONE]'\n);\n\n// ── 6. Build token → real value map for unmask node ──────────\n// This is the reverse: token → real value\nconst tokenMap = {};\nfor (const { val, token } of replaceMap) {\n  tokenMap[token] = val;\n}\n\n// Also store case reference from the text if found\nconst caseRefMatch = prevText.match(/\\b(PCS-[A-Z]+-[A-Z0-9]+)\\b/i);\nif (caseRefMatch) tokenMap['[CASE-REF]'] = caseRefMatch[1];\n\n// ── 7. Return everything ──────────────────────────────────────\nreturn [{\n  json: {\n    // → Masked text for letter AI prompt\n    maskedPrevCorrespondence: maskedPrev,\n\n    // → Token map for unmask node\n    tokenMap,\n\n    // → Individual values for easy access\n    realValues: {\n      member_reference: piiData.memberId?.values?.[0]      ?? null,\n      dob:              piiData.dob?.values?.[0]            ?? null,\n      address:          piiData.address?.values?.[0]        ?? null,\n      postcode:         piiData.postcode?.values?.[0]       ?? null,\n      phone:            piiData.phone?.values?.[0]          ?? null,\n      nino:             piiData.nino?.values?.[0]           ?? null,\n      member_name:      detectedNames[0]                    ?? null,\n      case_reference:   caseRefMatch?.[1]                   ?? null,\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2128,
+        288
+      ],
+      "id": "2dcf58bf-4af1-407a-8a5a-fd829f593358",
+      "name": "mask"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── 📥 Normalise Input ────────────────────────────────────────\n// Receives data from dashboard via webhook\n// Fields received: email_subject, email_body, attachment_text,\n//                  from_address, session_id, start_time\n\nconst payload = $('Webhook — Dashboard').item.json.body || $('Webhook — Dashboard').item.json;\n\nconst text          = payload.email_body      || '';\nconst subject       = payload.email_subject   || '';\nconst from_address  = payload.from_address    || 'demo@pensionco.co.uk';\nconst attachment_text = payload.attachment_text || '';\nconst session_id    = String($execution.id)      || '';\nconst start_time    = payload.start_time      || Date.now();\nconst trigger_source = 'webhook';\n\nreturn [{\n  json: {\n    text,\n    subject,\n    from_address,\n    attachment_text,\n    session_id,\n    trigger_source,\n    start_time\n  }\n}];;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4048,
+        480
+      ],
+      "id": "aa9b9a26-5580-4122-88af-d854df1f75dc",
+      "name": "📥 Normalise Input"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pension-demo",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -4272,
+        480
+      ],
+      "id": "8c207cbd-6fcb-48c7-93c2-fc092788b043",
+      "name": "Webhook — Dashboard",
+      "webhookId": "a95db1c1-4f4e-447c-94c5-c2679b7c1a3a"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "852f458c-4906-423b-8fdc-f7a03d57e42c",
+              "name": "member_nino",
+              "type": "string",
+              "value": "={{$('validation').item.json.member_nino}}"
+            },
+            {
+              "id": "ed002e84-5f09-4893-ad5d-9301420c4212",
+              "name": "letter_content",
+              "type": "string",
+              "value": "={{ $json.cleaned_text }}"
+            },
+            {
+              "id": "908cfb54-e1db-4128-864b-0e823e62dc65",
+              "name": "file_name",
+              "type": "string",
+              "value": "={{$('📁 BEST — Create Case').item.json.case_id}}_ADDRESS_MISMATCH_{{ $now.toFormat(\"yyyyMMdd\")}}.txt"
+            },
+            {
+              "id": "db4d657e-35b8-4b4b-8b21-2556bb6adad8",
+              "name": "recipient_email",
+              "type": "string",
+              "value": "={{$('validation').item.json.sender_email}}"
+            },
+            {
+              "id": "e1501766-e31f-493b-b38d-1f42bbba6673",
+              "name": "email_subject",
+              "type": "string",
+              "value": "=Enquiry - Case {{$('📁 BEST — Create Case').item.json.case_id}}"
+            },
+            {
+              "id": "72eda7a1-a6da-43da-866b-bec120def66d",
+              "name": "email_body",
+              "type": "string",
+              "value": "=Dear {{ $('⚙️ Set — Parsed AI Fields').item.json.member_name }},\n\nThank you for contacting PensionCo Administration.\n\nYour enquiry has been received and logged under the case reference **{{ $('📁 BEST — Create Case').item.json.case_id }}**.\n\nWe have reviewed your request and prepared a detailed response addressing your queries. Please refer to the document attached with this email for the complete information.\n\nIf you require any further assistance or clarification, please do not hesitate to contact us and quote your case reference in all future correspondence.\n\nYours sincerely,\nabc Administration"
+            },
+            {
+              "id": "967f9c52-85cd-437a-a3bb-d12d4e79485f",
+              "name": "query_type",
+              "value": "={{ $('⚙️ Set — Parsed AI Fields').item.json.query_type }}",
+              "type": "string"
+            },
+            {
+              "id": "1e2e6111-3a63-4caf-b51c-188fa759d559",
+              "name": "case_id",
+              "value": "={{ $('📁 BEST — Create Case').item.json.case_id }}",
+              "type": "string"
+            },
+            {
+              "id": "1c05face-21f2-4124-8cdd-b3a1ec8f202d",
+              "name": "session_id",
+              "value": "={{ $('📥 Normalise Input').item.json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "c26cf2a7-5c5d-4155-ba25-c4a908a4451c",
+              "name": "trigger_source",
+              "value": "={{ $('📥 Normalise Input').item.json.trigger_source }}",
+              "type": "string"
+            },
+            {
+              "id": "4f0f4227-b3e8-4035-a9ad-e4a4d5ddb12b",
+              "name": "query_type",
+              "value": "={{ $('parse').item.json.query_type }}",
+              "type": "string"
+            },
+            {
+              "id": "a68ffee1-e5ba-443b-bed1-c5ce1e56d8b0",
+              "name": "sender_type",
+              "value": "={{ $('parse').item.json.sender_type }}",
+              "type": "string"
+            },
+            {
+              "id": "7bd3bbcc-ebd6-41e8-81af-d20c4120a4ca",
+              "name": "processing_time_ms",
+              "value": "={{ Date.now() - ($('📥 Normalise Input').item.json.start_time ?? Date.now()) }}",
+              "type": "string"
+            },
+            {
+              "id": "df065b73-b265-4f20-a10d-32951bd23206",
+              "name": "step_name",
+              "value": "Acknowledgement Letter Sent",
+              "type": "string"
+            },
+            {
+              "id": "ef5c87b3-0902-40f8-9521-dffe127e720a",
+              "name": "step_detail",
+              "value": "Case closed successfully",
+              "type": "string"
+            },
+            {
+              "id": "b894b6ec-56f9-4113-8c97-5335670f3a18",
+              "name": "outcome",
+              "value": "closed",
+              "type": "string"
+            },
+            {
+              "id": "51ec3c76-623f-4832-83f2-71b57c49b8ed",
+              "name": "best_status",
+              "value": "CLOSED",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "21129c2f-2cca-4c47-990f-c922399bf6bd",
+      "name": "sending ack letter",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3152,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ekYdrDZyzDXPjTMP",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/ekYdrDZyzDXPjTMP"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "749b00f9-aec2-4fda-97f9-c87ca73e40a0",
+      "name": "🔁 Dispatch: Ack letter",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        3376,
+        192
+      ],
+      "notes": "Calls Sub: Drive Upload & Gmail Dispatch. Pass: member_nino, address mismatch holding letter content, recipient_email."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "852f458c-4906-423b-8fdc-f7a03d57e42c",
+              "name": "member_nino",
+              "type": "string",
+              "value": "={{$('validation').item.json.member_nino}}"
+            },
+            {
+              "id": "ed002e84-5f09-4893-ad5d-9301420c4212",
+              "name": "letter_content",
+              "type": "string",
+              "value": "=PensionCo Administration\nDate: {{ $now.toFormat(\"d MMMM yyyy\")}}\n\n{{$('validation').item.json.member_name}} \n\nDear {{$('validation').item.json.member_name}} ,\n\nRe: Pension Enquiry — Case Reference {{$('📁 BEST — Create Case').item.json.case_id}} — Address Verification Required\n\nThank you for contacting PensionCo Administration.\n\nWe have been unable to verify your current address against our records. Please provide proof of your current address (e.g. a recent utility bill or bank statement dated within the last 3 months) so we can update our records and proceed with your enquiry.\n\nYours sincerely,\nPensionCo Administration"
+            },
+            {
+              "id": "908cfb54-e1db-4128-864b-0e823e62dc65",
+              "name": "file_name",
+              "type": "string",
+              "value": "={{$('📁 BEST — Create Case').item.json.case_id}}_ADDRESS_MISMATCH_{{ $now.toFormat(\"yyyyMMdd\")}}.txt"
+            },
+            {
+              "id": "db4d657e-35b8-4b4b-8b21-2556bb6adad8",
+              "name": "recipient_email",
+              "type": "string",
+              "value": "={{ $('📥 Normalise Input').item.json.from_address }}"
+            },
+            {
+              "id": "e1501766-e31f-493b-b38d-1f42bbba6673",
+              "name": "email_subject",
+              "type": "string",
+              "value": "=Action Required — Address Verification — Case {{$('📁 BEST — Create Case').item.json.case_id}}"
+            },
+            {
+              "id": "72eda7a1-a6da-43da-866b-bec120def66d",
+              "name": "email_body",
+              "type": "string",
+              "value": "=Dear {{$('validation').item.json.member_name}} ,\n\nCase Reference: {{$('📁 BEST — Create Case').item.json.case_id}}\n\nWe require address verification to proceed with your enquiry. Please see the attached letter for details.\n\nYours sincerely,\nPensionCo Administration"
+            },
+            {
+              "id": "14ac194a-e001-42ed-b18c-df138fc33af4",
+              "name": "session_id",
+              "value": "={{ $('📥 Normalise Input').item.json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "33c48084-6331-4eda-93d3-265f5d6f6344",
+              "name": "trigger_source",
+              "value": "={{ $('📥 Normalise Input').item.json.trigger_source }}",
+              "type": "string"
+            },
+            {
+              "id": "42746d0a-9ce8-49e4-aaa0-746d46b88293",
+              "name": "query_type",
+              "value": "={{ $('parse').item.json.query_type }}",
+              "type": "string"
+            },
+            {
+              "id": "509e5fe9-5a8e-4ba6-a66e-9040c2277255",
+              "name": "processing_time_ms",
+              "value": "={{ Date.now() - ($('📥 Normalise Input').item.json.start_time ?? Date.now()) }}",
+              "type": "string"
+            },
+            {
+              "id": "2aa685e1-7990-43a9-811d-ced843d706d8",
+              "name": "=cap_reference",
+              "value": "={{ $('set cap reference').item.json.cap_reference ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "5b568ebb-ece5-48bb-afb7-a4f87f7b77fa",
+              "name": "case_id",
+              "value": "={{ $('📁 BEST — Create Case').item.json.case_id ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "673f96b4-9ea0-4457-9dd7-d27e9e193ad2",
+              "name": "sender_type",
+              "value": "={{ $('parse').item.json.sender_type }}",
+              "type": "string"
+            },
+            {
+              "id": "3ea45d13-35f3-4ea9-9a30-1151b666b77b",
+              "name": "step_name",
+              "value": "Address Mismatch Letter Sent",
+              "type": "string"
+            },
+            {
+              "id": "74441460-69d4-4a72-bf5a-1c6cea32d49a",
+              "name": "step_detail",
+              "value": "Case pended — address verification required",
+              "type": "string"
+            },
+            {
+              "id": "9cf527ec-de87-4cda-ab1b-b638ed7f685f",
+              "name": "outcome",
+              "value": "pended_address_mismatch",
+              "type": "string"
+            },
+            {
+              "id": "117d513f-8b05-4937-86f3-4c2c1da17f03",
+              "name": "best_status",
+              "value": "PENDED",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "43d48b99-901e-4f02-9775-ef482df0a73a",
+      "name": "📦 Prepare — Address Mismatch",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1456,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"received\",\n  \"execution_id\": \"{{ $execution.id }}\"\n} ",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -3824,
+        480
+      ],
+      "id": "70c3aa28-58e1-4a58-8081-79c1737ae952",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "tableId": "demo_progress",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('📥 Normalise Input').item.json.session_id }}"
+            },
+            {
+              "fieldId": "step_name",
+              "fieldValue": "Email Received"
+            },
+            {
+              "fieldId": "step_number",
+              "fieldValue": "1"
+            },
+            {
+              "fieldId": "step_detail",
+              "fieldValue": "={{ $('📥 Normalise Input').item.json.from_address }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -3600,
+        480
+      ],
+      "id": "5ba54f98-3d38-4f96-8858-283d6daf742c",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "demo_progress",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('📥 Normalise Input').item.json.session_id }}"
+            },
+            {
+              "fieldId": "step_name",
+              "fieldValue": "AI Classified"
+            },
+            {
+              "fieldId": "step_number",
+              "fieldValue": "2"
+            },
+            {
+              "fieldId": "step_detail",
+              "fieldValue": "={{ $json.query_type }}, Confidence: {{ $('⚙️ AI — Confidence Check').item.json.confidence_score }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1680,
+        384
+      ],
+      "id": "fc3d5a07-5988-4797-8ab5-1c761377375e",
+      "name": "logging",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "demo_progress",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $('📥 Normalise Input').item.json.session_id }}"
+            },
+            {
+              "fieldId": "step_name",
+              "fieldValue": "CAP Assigned"
+            },
+            {
+              "fieldId": "step_number",
+              "fieldValue": "3"
+            },
+            {
+              "fieldId": "step_detail",
+              "fieldValue": "=CAP Ref: {{ $('set cap reference').item.json.cap_reference }}, Case ID: {{ $('📁 BEST — Create Case').item.json.case_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        384
+      ],
+      "id": "005cdf5a-a949-4744-b72b-9bc20e3f75a3",
+      "name": "logging1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
+      "typeVersion": 1,
+      "position": [
+        -2912,
+        800
+      ],
+      "id": "6ccc6f71-05f4-40ff-b74e-934de748a60d",
+      "name": "Azure OpenAI Chat Model",
+      "credentials": {
+        "azureOpenAiApi": {
+          "id": "xfywYthtFz3tZghp",
+          "name": "Azure Open AI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAzureOpenAi",
+      "typeVersion": 1,
+      "position": [
+        2656,
+        416
+      ],
+      "id": "65030dc3-c31c-4bec-a146-7a4e3163cb75",
+      "name": "Azure OpenAI Chat Model2",
+      "credentials": {
+        "azureOpenAiApi": {
+          "id": "xfywYthtFz3tZghp",
+          "name": "Azure Open AI account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Webhook — Dashboard": [
+      {
+        "json": {
+          "headers": {
+            "host": "arrange-wireless-thwarting.ngrok-free.dev",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
+            "content-length": "1029",
+            "accept": "*/*",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "en-US,en;q=0.9,ml;q=0.8",
+            "content-type": "application/json",
+            "origin": "https://stalwart-blancmange-a2e1d2.netlify.app",
+            "priority": "u=1, i",
+            "referer": "https://stalwart-blancmange-a2e1d2.netlify.app/",
+            "sec-ch-ua": "\"Google Chrome\";v=\"147\", \"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"147\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "x-forwarded-for": "117.247.215.4",
+            "x-forwarded-host": "arrange-wireless-thwarting.ngrok-free.dev",
+            "x-forwarded-proto": "https"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "email_subject": "Transfer Value Request — IFA Enquiry",
+            "email_body": "Dear PensionCo Administration Team,\n\nI am writing on behalf of my client Margaret Holloway regarding her preserved pension benefits under the Elements Group Pension Scheme.\n\nPlease find attached a Letter of Authority signed by the member authorising our firm to act on her behalf.\n\nMember Name: Margaret Holloway\nNational Insurance Number: CD789012D\nDate of Birth: 12 June 1968\nMember Reference: EGP-2024-00445\nAddress: 18 Park Lane, London, SW1A 2AA\n\nKind regards,\nDaniel Smith\nPartners Financial Planning Ltd",
+            "attachment_text": "LETTER OF AUTHORITY Date: 10 January 2026 To whom it may concern, I, Margaret Holloway, hereby authorise Partners Financial Planning Ltd and Daniel Smith to obtain information regarding my pension bene fi ts from Aptia. Member Details Name: Margaret Holloway National Signed Margaret Holloway  3/16/26, 5:25 PM  Generated with https://kome.ai",
+            "from_address": "devikaraj5885@gmail.com",
+            "start_time": 1775995955598
+          },
+          "webhookUrl": "http://localhost:5678/webhook/pension-demo",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "🗄️ Supabase — Get Member by NINO": {
+      "main": [
+        [
+          {
+            "node": "🔀 Member Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Member Found?": {
+      "main": [
+        [
+          {
+            "node": "🔀 Sender Type — IFA or Member?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update as pended",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Sender Type — IFA or Member?": {
+      "main": [
+        [
+          {
+            "node": "🔐 LOA — Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔐 LOA — Valid?": {
+      "main": [
+        [
+          {
+            "node": "validation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "⏳ Wait — Before LOA Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🤖 AI — Draft Response Letter": {
+      "main": [
+        [
+          {
+            "node": "parse1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set cap reference": {
+      "main": [
+        [
+          {
+            "node": "📁 BEST — Create Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "mask",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse1": {
+      "main": [
+        [
+          {
+            "node": "sending ack letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 CAP — Create Record": {
+      "main": [
+        [
+          {
+            "node": "set cap reference",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📁 BEST — Create Case": {
+      "main": [
+        [
+          {
+            "node": "logging1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Address Mismatch?": {
+      "main": [
+        [
+          {
+            "node": "🔄 BEST — Create MDU Case",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "⏳ Wait — Before Address Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔄 BEST — Set Status PENDED (no address)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search  folders1": {
+      "main": [
+        [
+          {
+            "node": "get latest same query file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "☁️ Drive — Download Latest File1": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validation": {
+      "main": [
+        [
+          {
+            "node": "filelds match?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "filelds match?": {
+      "main": [
+        [
+          {
+            "node": "Search  folders1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔀 Address Mismatch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 BEST — Create MDU Case": {
+      "main": [
+        [
+          {
+            "node": "🔄 BEST — Set Status PENDED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update as pended": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait — Before Not Found Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get latest same query file": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "☁️ Drive — Download Latest File1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🤖 AI — Draft Response Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔁 Dispatch: LOA Rejection Letter": {
+      "main": [
+        []
+      ]
+    },
+    "⏳ Wait — Before Draft Letter": {
+      "main": [
+        [
+          {
+            "node": "🤖 AI — Draft Response Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait — Before LOA Dispatch": {
+      "main": [
+        [
+          {
+            "node": "📦 Prepare — LOA Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait — Before Address Dispatch": {
+      "main": [
+        [
+          {
+            "node": "📦 Prepare — Address Mismatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait — Before Identity Dispatch": {
+      "main": [
+        [
+          {
+            "node": "📦 Prepare — Identity Mismatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait — Before Not Found Dispatch": {
+      "main": [
+        [
+          {
+            "node": "📦 Prepare — Member Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait — Before CAP Create": {
+      "main": [
+        [
+          {
+            "node": "📋 CAP — Create Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait — Gemini Rate Limit": {
+      "main": [
+        [
+          {
+            "node": "🤖 AI — Extract & Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🤖 AI — Extract & Classify": {
+      "main": [
+        [
+          {
+            "node": "parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse": {
+      "main": [
+        [
+          {
+            "node": "⚙️ AI — Confidence Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Set — Parsed AI Fields": {
+      "main": [
+        [
+          {
+            "node": "logging",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📦 Prepare — LOA Rejection": {
+      "main": [
+        [
+          {
+            "node": "🔁 Dispatch: LOA Rejection Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📦 Prepare — Identity Mismatch": {
+      "main": [
+        [
+          {
+            "node": "🔁 Dispatch: Identity Mismatch Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📦 Prepare — Member Not Found": {
+      "main": [
+        [
+          {
+            "node": "🔁 Dispatch: Member Not Found Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ AI — Confidence Check": {
+      "main": [
+        [
+          {
+            "node": "🔀 Confidence Pass?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Confidence Pass?": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Set — Parsed AI Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📦 Prepare — Low Confidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📦 Prepare — Low Confidence": {
+      "main": [
+        [
+          {
+            "node": "🔁 Dispatch: Low Confidence Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 BEST — Set Status PENDED (no address)": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait — Before Identity Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "data masking": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait — Gemini Rate Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "mask": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait — Before Draft Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📥 Normalise Input": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook — Dashboard": {
+      "main": [
+        [
+          {
+            "node": "📥 Normalise Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "sending ack letter": {
+      "main": [
+        [
+          {
+            "node": "🔁 Dispatch: Ack letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📦 Prepare — Address Mismatch": {
+      "main": [
+        [
+          {
+            "node": "🔁 Dispatch: Address Mismatch Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "data masking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "🤖 AI — Extract & Classify",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "logging1": {
+      "main": [
+        [
+          {
+            "node": "🗄️ Supabase — Get Member by NINO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "logging": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait — Before CAP Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Azure OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "🤖 AI — Draft Response Letter",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "l7NLGch8O4QP9waH",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "0789472a-24e0-45a3-9761-458f8fafee09",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a0c499356921f3eb423f7ddf94f46378dfe81ea2a3c94b1e604ef314c524d665"
+  },
+  "id": "DJp2utbInz86R6mP",
+  "tags": []
+}

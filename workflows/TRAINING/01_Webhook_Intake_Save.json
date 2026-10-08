@@ -1,0 +1,172 @@
+{
+  "name": "Training 1 — Webhook Intake & Save",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "training-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1111111-1111-4111-8111-111111111111",
+      "name": "Webhook — Intake",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -300,
+        0
+      ],
+      "webhookId": "a1111111-1111-4111-8111-111111111111"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "full_name",
+              "value": "={{ $json.body.full_name || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "email",
+              "value": "={{ ($json.body.email || '').toLowerCase().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "category",
+              "value": "={{ $json.body.category || 'general' }}",
+              "type": "string"
+            },
+            {
+              "id": "f4",
+              "name": "message",
+              "value": "={{ $json.body.message || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a2222222-2222-4222-8222-222222222222",
+      "name": "Edit — Clean Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -80,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "training_submissions",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "full_name",
+              "fieldValue": "={{ $json.full_name }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $json.category }}"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "={{ $json.message }}"
+            }
+          ]
+        }
+      },
+      "id": "a3333333-3333-4333-8333-333333333333",
+      "name": "Supabase — Insert Submission",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        140,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"ok\": true, \"saved_id\": $json.id, \"email\": $json.email } }}",
+        "options": {}
+      },
+      "id": "a4444444-4444-4444-8444-444444444444",
+      "name": "Respond — Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        360,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Training 1 — Webhook Intake & Save\n\n**Nodes:** Webhook · Edit Fields · Supabase (insert) · Respond\n\n**Flow:** form data → clean fields → save row in `training_submissions` → reply with new id\n\n---\n\n### 🧪 Test — POST `/training-intake`\n\n```json\n{\n  \"full_name\": \"Priya Sharma\",\n  \"email\": \"  PRIYA@Example.com \",\n  \"category\": \"sales\",\n  \"message\": \"Interested in your plans\"\n}\n```\n\n**Expect:** `{ \"ok\": true, \"saved_id\": 2, \"email\": \"priya@example.com\" }`",
+        "height": 620,
+        "width": 460
+      },
+      "id": "a5555555-5555-4555-8555-555555555555",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        -800
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — Intake": {
+      "main": [
+        [
+          {
+            "node": "Edit — Clean Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — Clean Fields": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Insert Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase — Insert Submission": {
+      "main": [
+        [
+          {
+            "node": "Respond — Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

@@ -19,6 +19,9 @@ First-pass map (2026-10-02) — grow this as files are added.
 - `logs/` — run logs (gitignored, check before assuming it's empty).
 - `skills/` — Claude Code skills used in this workspace.
 - `workflows/` — n8n workflow JSON exports.
+- `workflows/PENSION/` — client PensionCo automation (main + chaser + drive/email sub).
+- `workflows/TRAINING/` — 5 simple generic training workflows (intro to webhook/set/switch/if/http/code/gmail/supabase) + `00_supabase_setup.sql`. Not pension-related; use client pension.co Supabase as DB host only. Workflow 5 calls postcodes.io.
+- `workflows/TRAINING/06_*` — Training 6: "Pension Enquiry" main workflow (saves row first) calling 3 sub-workflows (Sub 1 email member, Sub 2 notify admin, Sub 3 update same row status). Import the 3 Subs first.
 
 ## Docs
 

@@ -1,0 +1,61 @@
+{
+  "name": "Training 6 — Sub 1: Email Member",
+  "nodes": [
+    {
+      "parameters": { "inputSource": "passthrough" },
+      "id": "a6020002-0000-4000-8000-000000000001",
+      "name": "Start — From Main",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Your pension enquiry — Reference PEN-{{ $json.id }}",
+        "emailType": "text",
+        "message": "=Dear {{ $json.full_name }},\n\nThank you for your pension enquiry ({{ $json.category }}).\n\nYour reference number is PEN-{{ $json.id }}.\nWe will respond within 5 working days.\n\nYours sincerely,\nPensionCo Administration",
+        "options": { "appendAttribution": false }
+      },
+      "id": "a6020002-0000-4000-8000-000000000002",
+      "name": "Gmail — Acknowledge Member",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [240, 0],
+      "webhookId": "a6020002-0000-4000-8000-000000000002",
+      "credentials": {
+        "gmailOAuth2": { "id": "a05A9Hadr3xDgrNU", "name": "Gmail account" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Send the original enquiry data back to the main workflow\nreturn $('Start — From Main').all();"
+      },
+      "id": "a6020002-0000-4000-8000-000000000003",
+      "name": "Code — Return Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "content": "## 📧 Sub 1 — Email Member\n\nCalled by the main workflow.\n\nSends the member an acknowledgement email with their reference number (PEN-id), then hands the enquiry data back so the main workflow can continue.",
+        "height": 380,
+        "width": 740,
+        "color": 5
+      },
+      "id": "a6020002-0000-4000-8000-000000000004",
+      "name": "Note — Sub 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-80, -260]
+    }
+  ],
+  "connections": {
+    "Start — From Main": { "main": [[{ "node": "Gmail — Acknowledge Member", "type": "main", "index": 0 }]] },
+    "Gmail — Acknowledge Member": { "main": [[{ "node": "Code — Return Data", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "callerPolicy": "workflowsFromSameOwner" },
+  "tags": []
+}

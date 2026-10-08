@@ -1,0 +1,850 @@
+{
+  "name": "PensionCo — Chaser Workflow (Gmail)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "ac40be8a-d9f1-42c7-a698-7f7f89b3e01f",
+      "name": "⏰ Schedule — Daily Chaser Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2768,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:5005/best/cases",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "PENDED"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dbf101ed-debb-4a70-aaea-72353203485f",
+      "name": "📋 BEST — Get All Pended Cases",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2544,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst cases = response.cases ?? [];\n\nif (cases.length === 0) {\n  return [{ json: { no_pending_cases: true, message: 'No pended cases found' } }];\n}\n\nreturn cases.map(c => ({ json: c }));"
+      },
+      "id": "52fc63e2-24b0-4f2a-acbd-ad532718611c",
+      "name": "⚙️ Split — Cases Array",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2240,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter cases where chaser is due (10+ days since last chaser)\nconst cases = $input.all();\n\nconst due = cases.filter(item => {\n  const c = item.json;\n\n  // Skip if no sender email\n  if (!c.sender_email && !c.member_nino) return false;\n\n  const lastChaser = c.last_chaser_date ? new Date(c.last_chaser_date) : null;\n  const pendedDate = c.pended_date ? new Date(c.pended_date) : null;\n  const reference  = lastChaser ?? pendedDate;\n\n  if (!reference) return false;\n\n  const daysSince = Math.floor((new Date() - reference) / 86400000);\n\n  // Send chaser if 10+ days since last contact\n  return daysSince >= 10;\n});\n\nif (due.length === 0) {\n  return [{ json: { no_cases_due: true, message: 'No chasers due today' } }];\n}\n\nreturn due;"
+      },
+      "id": "74ca9d77-f64f-4d1a-ab43-9ad0804e5a0f",
+      "name": "⚙️ Code — Filter Cases Due for Chaser",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1568,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n\n  const c = item.json;\n\n  const daysSinceChaser = c.last_chaser_date\n    ? Math.floor((new Date() - new Date(c.last_chaser_date)) / 86400000)\n    : 999;\n\n  const chaserCount = c.chaser_count ?? 0;\n\n  const isEscalation = chaserCount >= 2;\n\n  const subject = isEscalation\n    ? `URGENT - Action Required - Case ${c.case_id} - Final Reminder`\n    : `Reminder - Action Required - Case ${c.case_id}`;\n\n  const pendedReasonText = {\n    ADDRESS_MISMATCH: 'the address you provided does not match our records',\n    AWAITING_ADDRESS_PROOF: 'we are awaiting proof of your current address',\n    MEMBER_NOT_FOUND: 'we were unable to locate your membership record',\n    LOA_INVALID: 'a valid Letter of Authority was not provided',\n    IDENTITY_MISMATCH: 'some of your personal details do not match our records',\n  }[c.pended_reason] ?? 'we require additional information to proceed';\n\n  const body = `PensionCo Administration\nDate: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}\n\nDear ${c.member_name},\n\nRe: Pension Enquiry - Case Reference ${c.case_id}${isEscalation ? ' - URGENT FINAL REMINDER' : ' - Reminder'}\n\nWe are writing regarding your pension enquiry which remains on hold because ${pendedReasonText}.\n\nYour case was opened on ${c.pended_date ? new Date(c.pended_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'a recent date'} and we have not yet received the required information.\n\n${isEscalation\n  ? 'This is your final reminder. If we do not receive the required information within 5 working days, your case will be closed and you will need to resubmit your enquiry.'\n  : 'Please respond at your earliest convenience to allow us to continue processing your request.'\n}\n\nWhat we need from you:\n\n${c.pended_reason === 'ADDRESS_MISMATCH' || c.pended_reason === 'AWAITING_ADDRESS_PROOF'\n  ? '- Proof of your current address (utility bill or bank statement dated within 3 months)'\n  : c.pended_reason === 'LOA_INVALID'\n  ? '- A current signed Letter of Authority dated within the last 12 months'\n  : c.pended_reason === 'IDENTITY_MISMATCH'\n  ? '- Confirmation of your full name, National Insurance number, date of birth, and current address'\n  : '- Please contact us to discuss what information is required'\n}\n\nPlease reply to this email quoting your case reference ${c.case_id}.\n\nYours sincerely,\nPensionCo Administration\nCase Reference: ${c.case_id}\nChaser Number: ${chaserCount + 1}`;\n\n  return {\n    json: {\n      ...c,\n      chaser_subject: subject,\n      chaser_body: body,\n      days_since_chaser: daysSinceChaser,\n      chaser_count: chaserCount,\n      is_escalation: isEscalation,\n      new_chaser_count: chaserCount + 1\n    }\n  };\n\n});"
+      },
+      "id": "e512511c-9586-41fb-bef6-745024707af6",
+      "name": "⚙️ Code — Build Chaser Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.sender_email }}",
+        "subject": "={{ $json.chaser_subject }}",
+        "emailType": "text",
+        "message": "={{ $json.chaser_body }}",
+        "options": {}
+      },
+      "id": "db39e8a4-7830-4092-91df-ed978b09c923",
+      "name": "📧 Send — Chaser Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -896,
+        96
+      ],
+      "webhookId": "74196686-e3dc-4232-a606-44b47b66ea2e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "9N36Y7jSoVoecFAw",
+          "name": "PRAVEEN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://127.0.0.1:5005/best/cases/{{ $('⚙️ Code — Build Chaser Email').item.json.case_id }}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"last_chaser_date\": \"{{ $now.toISO() }}\",\n  \"chaser_count\": {{ $('⚙️ Code — Build Chaser Email').item.json.new_chaser_count }}\n}",
+        "options": {}
+      },
+      "id": "bad8520f-15d3-4613-9cd8-59f041680cb2",
+      "name": "🔄 BEST — Update Chaser Date",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -672,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $('⚙️ Code — Build Chaser Email').item.json.member_nino }}",
+        "limit": 1,
+        "filter": {
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "id": "27b7b517-65a0-493f-abfc-e3048352984b",
+      "name": "🔍 Drive — Search Member Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -448,
+        96
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bc38f93a-d64b-46d1-97b5-6fab2cb320fc",
+              "leftValue": "={{ $json.id ?? '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "3abd496c-d6b2-496c-8b91-2604a4e246e6",
+      "name": "🔀 Member Folder Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "createFromText",
+        "content": "={{ $('⚙️ Code — Build Chaser Email').item.json.chaser_body }}",
+        "name": "={{ $('⚙️ Code — Build Chaser Email').item.json.case_id }}_Chaser{{ $('⚙️ Code — Build Chaser Email').item.json.new_chaser_count }}_{{ $now.toFormat('yyyyMMdd') }}.txt",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "9cf2988e-7d95-40db-8796-7c5e1585f655",
+      "name": "☁️ Drive — Upload Chaser (existing folder)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('⚙️ Code — Filter Cases Due for Chaser').item.json.member_nino }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "id": "2ad773b0-8684-4f34-81f8-4b26b1f97dcf",
+      "name": "📂 Drive — Create Member Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        0,
+        192
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "createFromText",
+        "content": "={{ $('⚙️ Code — Build Chaser Email').item.json.chaser_body }}",
+        "name": "={{ $('⚙️ Code — Build Chaser Email').item.json.case_id }}_Chaser{{ $('⚙️ Code — Build Chaser Email').item.json.new_chaser_count }}_{{ $now.toFormat('yyyyMMdd') }}.txt",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "62fc0d90-3af1-475b-8d30-d187571a4f42",
+      "name": "☁️ Drive — Upload Chaser (new folder)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        224,
+        192
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://127.0.0.1:5005/best/cases/{{ $('Filter').item.json.case_id }}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"status\": \"CLOSED\",\n  \"closed_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "c35ba550-e31c-4844-aabd-c7ae0cb1bfdd",
+      "name": "🔄 BEST — Close Case (No Response)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1120,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fe6fc59f-d5f2-4b87-be4b-25eeae46beb3",
+              "leftValue": "={{ $json.no_pending_cases ?? false }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2016,
+        192
+      ],
+      "id": "7a5c08c6-1b40-42f9-9e3a-c876c7e70802",
+      "name": "🔀 Any Pended Cases?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9aff170d-f068-43a3-9c46-fcade47de8f1",
+              "leftValue": "={{ $json.no_cases_due ?? false }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1344,
+        96
+      ],
+      "id": "4cfd6635-1d8c-4a96-9ced-7ea79fb55ac5",
+      "name": "🔀 Chasers Due Today?"
+    },
+    {
+      "parameters": {
+        "operation": "createFromText",
+        "content": "=PensionCo Administration\nDate: {{ $now.toFormat('d MMMM yyyy') }}\n\nDear {{ $json.member_name }},\n\nRe: Pension Enquiry — Case Reference {{ $json.case_id }} — Final Notice\n\nWe have contacted you on several occasions regarding your pension enquiry which remains on hold. Despite previous reminders we have not received the required information.\n\nWe are therefore closing your case with immediate effect.\n\nIf you still wish to proceed with your enquiry please contact us quoting your original case reference {{ $json.case_id }}.\n\nYours sincerely,\nPensionCo Administration",
+        "name": "=={{ $json.case_id }}_EXCEPTIONAL_CLOSURE_{{ $now.toFormat('yyyyMMdd') }}.txt",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "f24cc2b1-9fb4-4245-a3bd-263064655692",
+      "name": "closure document",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -672,
+        288
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "875030f1-d931-4fde-8655-0ec15950e808",
+              "leftValue": "={{ $json.chaser_count }}",
+              "rightValue": 4,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1792,
+        192
+      ],
+      "id": "084a318c-46c2-44ec-bfe0-394e3c913fab",
+      "name": "check for chaser count"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "be359712-cdaf-4f0f-8c3b-a1de90c4f3a9",
+              "leftValue": "={{ Math.floor((new Date() - new Date($json.last_chaser_date)) / 86400000) }}",
+              "rightValue": 10,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -1552,
+        288
+      ],
+      "id": "b9f6f7a6-845d-4151-8913-789d696c7c7d",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.sender_email }}",
+        "subject": "=URGENT — Case {{ $json.case_id }} — Final Notice Before Closure",
+        "emailType": "text",
+        "message": "=PensionCo Administration\nDate: {{ $now.toFormat('d MMMM yyyy') }}\n\nDear {{ $json.member_name }},\n\nRe: Pension Enquiry — Case Reference {{ $json.case_id }} — Final Notice\n\nWe have contacted you on several occasions regarding your pension enquiry which remains on hold. Despite previous reminders we have not received the required information.\n\nWe are therefore closing your case with immediate effect.\n\nIf you still wish to proceed with your enquiry please contact us quoting your original case reference {{ $json.case_id }}.\n\nYours sincerely,\nPensionCo Administration",
+        "options": {}
+      },
+      "id": "f2571374-098c-43e8-a25c-00ec5e6c9740",
+      "name": "📧 Send — Chaser Email1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -1344,
+        288
+      ],
+      "webhookId": "65a4b4e5-cf37-4b6d-acf3-7eb6108b5fd8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "9N36Y7jSoVoecFAw",
+          "name": "PRAVEEN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $('⚙️ Split — Cases Array').item.json.member_nino }}",
+        "limit": 1,
+        "filter": {
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "id": "b72113fd-2b0c-4893-9ec3-bbf8e6b968cb",
+      "name": "🔍 Drive — Search Member Folder1",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -896,
+        288
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ok: true,\n    total: 2,\n    cases: [\n      {\n        case_id: \"EGP-GE-10001\",\n        case_type: \"GE\",\n        member_name: \"James Richardson\",\n        member_nino: \"AB123456C\",\n        member_reference: \"EGP-2024-00891\",\n        sender_email: \"praveen2232k@gmail.com\",\n        sender_type: \"MEMBER\",\n        status: \"PENDED\",\n        pended_reason: \"ADDRESS_MISMATCH\",\n        pended_date: \"2026-03-21T08:28:48.536256Z\",\n        last_chaser_date: \"2026-06-20T09:00:00Z\",\n        chaser_count: 2,\n        assigned_agent: \"processor1@aptia.co.uk\",\n        assigned_team: \"GE_TEAM_A\",\n        scheme_code: \"EGP\",\n        scheme_name: \"Employers Group Pension\",\n        sla_target_date: \"2026-07-15\",\n        priority: \"NORMAL\",\n        cap_reference: \"CAP-2026-DEMO01\",\n        closed_at: null,\n        closed_reason: null\n      },\n      {\n        case_id: \"EGP-TRANSFER-04EDE676\",\n        case_type: \"TRANSFER\",\n        member_name: \"Margaret Holloway\",\n        member_nino: \"CD000012D\",\n        member_reference: \"EGP-2024-00445\",\n        sender_email: \"praveen2232k@gmail.com\",\n        sender_type: \"IFA\",\n        status: \"PENDED\",\n        pended_reason: \"ADDRESS_MISMATCH\",\n        pended_date: \"2026-05-15T09:00:00Z\",\n        last_chaser_date: \"2026-06-15T09:00:00Z\",\n        chaser_count: 4,\n        assigned_agent: null,\n        assigned_team: \"GE_TEAM_A\",\n        scheme_code: \"EGP\",\n        scheme_name: null,\n        current_address: \"18 Park Lane, London, SW1A 2AA\",\n        current_stage: \"OPEN\",\n        sla_target_date: \"2026-04-29\",\n        priority: \"NORMAL\",\n        cap_reference: \"CAP-2026-1A00AF\",\n        closed_at: null,\n        closed_reason: null\n      }\n    ]\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2544,
+        192
+      ],
+      "id": "9981af74-ab95-49c3-901e-1bdb0ba52c85",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pension-demo-trigger",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2784,
+        384
+      ],
+      "id": "121d03c3-d96e-473b-a186-6c6509d8f617",
+      "name": "Webhook",
+      "webhookId": "bfcdadd8-01b5-4288-844c-525c98c24835"
+    }
+  ],
+  "pinData": {
+    "📋 BEST — Get All Pended Cases": [
+      {
+        "json": {
+          "cases": [
+            {
+              "assigned_agent": "processor1@aptia.co.uk",
+              "assigned_team": "GE_TEAM_A",
+              "cap_reference": "CAP-2026-DEMO01",
+              "case_id": "EGP-GE-10001",
+              "case_type": "GE",
+              "chaser_count": 2,
+              "closed_at": null,
+              "closed_reason": null,
+              "created_at": "2026-03-21T08:28:48.536297Z",
+              "last_chaser_date": "2026-06-25T09:00:00Z",
+              "last_modified_at": "2026-07-07T10:38:54.122156Z",
+              "member_name": "James Richardson",
+              "member_nino": "AB123456C",
+              "member_reference": "EGP-2024-00891",
+              "pended_date": "2026-03-21T08:28:48.536256Z",
+              "pended_reason": "ADDRESS_MISMATCH",
+              "priority": "NORMAL",
+              "scheme_code": "EGP",
+              "scheme_name": "Employers Group Pension",
+              "sender_email": "praveen2232k@gmail.com",
+              "sender_type": "MEMBER",
+              "sla_target_date": "2026-07-15",
+              "status": "PENDED"
+            },
+            {
+              "assigned_agent": null,
+              "assigned_team": "GE_TEAM_A",
+              "cap_reference": "CAP-2026-1A00AF",
+              "case_id": "EGP-TRANSFER-04EDE676",
+              "case_type": "TRANSFER",
+              "chaser_count": 4,
+              "closed_at": null,
+              "closed_reason": null,
+              "created_at": "2026-04-12T12:08:57.085401Z",
+              "current_address": "18 Park Lane, London, SW1A 2AA",
+              "current_stage": "OPEN",
+              "last_chaser_date": "2026-06-26T09:00:00Z",
+              "last_modified_at": "2026-07-07T10:40:19.018800Z",
+              "member_name": "Margaret Holloway",
+              "member_nino": "CD000012D",
+              "member_reference": "EGP-2024-00445",
+              "pended_date": "2026-05-15T09:00:00Z",
+              "pended_reason": "ADDRESS_MISMATCH",
+              "priority": "NORMAL",
+              "scheme_code": "EGP",
+              "scheme_name": null,
+              "sender_email": "praveen2232k@gmail.com",
+              "sender_type": "IFA",
+              "sla_target_date": "2026-04-29",
+              "status": "PENDED"
+            }
+          ],
+          "ok": true,
+          "total": 2
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "⏰ Schedule — Daily Chaser Check": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 BEST — Get All Pended Cases": {
+      "main": [
+        []
+      ]
+    },
+    "⚙️ Split — Cases Array": {
+      "main": [
+        [
+          {
+            "node": "🔀 Any Pended Cases?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Code — Filter Cases Due for Chaser": {
+      "main": [
+        [
+          {
+            "node": "🔀 Chasers Due Today?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Code — Build Chaser Email": {
+      "main": [
+        [
+          {
+            "node": "📧 Send — Chaser Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📧 Send — Chaser Email": {
+      "main": [
+        [
+          {
+            "node": "🔄 BEST — Update Chaser Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 BEST — Update Chaser Date": {
+      "main": [
+        [
+          {
+            "node": "🔍 Drive — Search Member Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Drive — Search Member Folder": {
+      "main": [
+        [
+          {
+            "node": "🔀 Member Folder Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Member Folder Exists?": {
+      "main": [
+        [
+          {
+            "node": "☁️ Drive — Upload Chaser (existing folder)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "📂 Drive — Create Member Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📂 Drive — Create Member Folder": {
+      "main": [
+        [
+          {
+            "node": "☁️ Drive — Upload Chaser (new folder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Any Pended Cases?": {
+      "main": [
+        [
+          {
+            "node": "check for chaser count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Chasers Due Today?": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Code — Build Chaser Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 BEST — Close Case (No Response)": {
+      "main": [
+        [
+          {
+            "node": "🔍 Drive — Search Member Folder1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check for chaser count": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Code — Filter Cases Due for Chaser",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "📧 Send — Chaser Email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📧 Send — Chaser Email1": {
+      "main": [
+        [
+          {
+            "node": "🔄 BEST — Close Case (No Response)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Drive — Search Member Folder1": {
+      "main": [
+        [
+          {
+            "node": "closure document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Split — Cases Array",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a66beb94-1e9a-48ea-8310-fceb9d958c46",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a0c499356921f3eb423f7ddf94f46378dfe81ea2a3c94b1e604ef314c524d665"
+  },
+  "id": "h2jo3fDHORxoLWA8",
+  "tags": []
+}

@@ -1,0 +1,61 @@
+{
+  "name": "Training 6 — Sub 2: Notify Admin",
+  "nodes": [
+    {
+      "parameters": { "inputSource": "passthrough" },
+      "id": "a6030003-0000-4000-8000-000000000001",
+      "name": "Start — From Main",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "sendTo": "aravindsg072@gmail.com",
+        "subject": "=New pension enquiry PEN-{{ $json.id }} — {{ $json.category }}",
+        "emailType": "text",
+        "message": "=New enquiry received.\n\nReference: PEN-{{ $json.id }}\nMember: {{ $json.full_name }}\nEmail: {{ $json.email }}\nType: {{ $json.category }}\n\nMessage:\n{{ $json.message }}\n\nThe member has been sent an acknowledgement.",
+        "options": { "appendAttribution": false }
+      },
+      "id": "a6030003-0000-4000-8000-000000000002",
+      "name": "Gmail — Alert Admin",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [240, 0],
+      "webhookId": "a6030003-0000-4000-8000-000000000002",
+      "credentials": {
+        "gmailOAuth2": { "id": "a05A9Hadr3xDgrNU", "name": "Gmail account" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Send the original enquiry data back to the main workflow\nreturn $('Start — From Main').all();"
+      },
+      "id": "a6030003-0000-4000-8000-000000000003",
+      "name": "Code — Return Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "content": "## 🔔 Sub 2 — Notify Admin\n\nCalled by the main workflow.\n\nSends a short internal alert to the admin inbox (`aravindsg072@gmail.com` — change in the Gmail node) with the case details, then hands the data back.",
+        "height": 380,
+        "width": 740,
+        "color": 5
+      },
+      "id": "a6030003-0000-4000-8000-000000000004",
+      "name": "Note — Sub 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-80, -260]
+    }
+  ],
+  "connections": {
+    "Start — From Main": { "main": [[{ "node": "Gmail — Alert Admin", "type": "main", "index": 0 }]] },
+    "Gmail — Alert Admin": { "main": [[{ "node": "Code — Return Data", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "callerPolicy": "workflowsFromSameOwner" },
+  "tags": []
+}

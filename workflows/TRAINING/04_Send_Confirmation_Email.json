@@ -1,0 +1,203 @@
+{
+  "name": "Training 4 — Send Confirmation Email",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "training-confirm",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d1111111-1111-4111-8111-111111111111",
+      "name": "Webhook — New Signup",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -360,
+        0
+      ],
+      "webhookId": "d1111111-1111-4111-8111-111111111111"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1",
+              "name": "email",
+              "value": "={{ ($json.body.email || '').toLowerCase().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "e2",
+              "name": "full_name",
+              "value": "={{ $json.body.full_name || 'there' }}",
+              "type": "string"
+            },
+            {
+              "id": "e3",
+              "name": "subject",
+              "value": "=Welcome, {{ $json.body.full_name || 'there' }}!",
+              "type": "string"
+            },
+            {
+              "id": "e4",
+              "name": "body",
+              "value": "=Hi {{ $json.body.full_name || 'there' }},\n\nThanks for signing up. This is your confirmation message.\n\nTeam",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d2222222-2222-4222-8222-222222222222",
+      "name": "Edit — Build Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "d3333333-3333-4333-8333-333333333333",
+      "name": "Gmail — Send Confirmation",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        120,
+        0
+      ],
+      "webhookId": "d3333333-3333-4333-8333-333333333333",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a05A9Hadr3xDgrNU",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "training_events",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "submission_email",
+              "fieldValue": "={{ $('Edit — Build Message').item.json.email }}"
+            },
+            {
+              "fieldId": "event_name",
+              "fieldValue": "Confirmation Sent"
+            },
+            {
+              "fieldId": "event_detail",
+              "fieldValue": "=Confirmation email sent to {{ $('Edit — Build Message').item.json.email }}"
+            }
+          ]
+        }
+      },
+      "id": "d4444444-4444-4444-8444-444444444444",
+      "name": "Supabase — Log Event",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        360,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"ok\": true, \"sent_to\": $('Edit — Build Message').item.json.email } }}",
+        "options": {}
+      },
+      "id": "d5555555-5555-4555-8555-555555555555",
+      "name": "Respond — Done",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        580,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Training 4 — Send Confirmation Email\n\n**Nodes:** Webhook · Edit Fields · Gmail · Supabase (log) · Respond\n\n**Flow:** build welcome message → send via Gmail → log in `training_events` → reply\n\n---\n\n### 🧪 Test — POST `/training-confirm`\n\n```json\n{\n  \"full_name\": \"Aravind Kumar\",\n  \"email\": \"aravindsg072@gmail.com\"\n}\n```\n\n**Expect:** `{ \"ok\": true, \"sent_to\": \"aravindsg072@gmail.com\" }`",
+        "height": 540,
+        "width": 460
+      },
+      "id": "d6666666-6666-4666-8666-666666666666",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        -720
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — New Signup": {
+      "main": [
+        [
+          {
+            "node": "Edit — Build Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — Build Message": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Send Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail — Send Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Log Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase — Log Event": {
+      "main": [
+        [
+          {
+            "node": "Respond — Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

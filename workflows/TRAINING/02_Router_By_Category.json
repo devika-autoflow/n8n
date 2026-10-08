@@ -1,0 +1,278 @@
+{
+  "name": "Training 2 — Router by Category",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "training-router",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b1111111-1111-4111-8111-111111111111",
+      "name": "Webhook — Enquiry",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -320,
+        0
+      ],
+      "webhookId": "b1111111-1111-4111-8111-111111111111"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c1",
+                    "leftValue": "={{ $json.body.category }}",
+                    "rightValue": "support",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "support"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c2",
+                    "leftValue": "={{ $json.body.category }}",
+                    "rightValue": "sales",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "sales"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "b2222222-2222-4222-8222-222222222222",
+      "name": "Router — By Category",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -80,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "route",
+              "value": "support",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "queue",
+              "value": "Tier-1 Support",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b3333333-3333-4333-8333-333333333333",
+      "name": "Edit — Support Queue",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        200,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s3",
+              "name": "route",
+              "value": "sales",
+              "type": "string"
+            },
+            {
+              "id": "s4",
+              "name": "queue",
+              "value": "Sales Team",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b4444444-4444-4444-8444-444444444444",
+      "name": "Edit — Sales Queue",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s5",
+              "name": "route",
+              "value": "general",
+              "type": "string"
+            },
+            {
+              "id": "s6",
+              "name": "queue",
+              "value": "General Inbox",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b5555555-5555-4555-8555-555555555555",
+      "name": "Edit — General Queue",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        200,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"routed_to\": $json.queue, \"route\": $json.route } }}",
+        "options": {}
+      },
+      "id": "b6666666-6666-4666-8666-666666666666",
+      "name": "Respond — Routed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Training 2 — Router by Category\n\n**Nodes:** Webhook · Switch · Edit Fields ×3 · Respond\n\n**Flow:** read `category` → Switch picks a branch → set queue → reply\n\n---\n\n### 🧪 Test 1 — Support branch\n\n```json\n{ \"category\": \"support\" }\n```\n\n### 🧪 Test 2 — Sales branch\n\n```json\n{ \"category\": \"sales\" }\n```\n\n### 🧪 Test 3 — Fallback (General)\n\n```json\n{ \"category\": \"billing\" }\n```",
+        "height": 640,
+        "width": 460
+      },
+      "id": "b7777777-7777-4777-8777-777777777777",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -820
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — Enquiry": {
+      "main": [
+        [
+          {
+            "node": "Router — By Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router — By Category": {
+      "main": [
+        [
+          {
+            "node": "Edit — Support Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit — Sales Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit — General Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — Support Queue": {
+      "main": [
+        [
+          {
+            "node": "Respond — Routed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — Sales Queue": {
+      "main": [
+        [
+          {
+            "node": "Respond — Routed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — General Queue": {
+      "main": [
+        [
+          {
+            "node": "Respond — Routed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

@@ -1,0 +1,744 @@
+{
+  "name": "PensionCo — Sub: Drive Upload & Email Dispatch (Masked) without vector",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "={{ $('When Executed by Another Workflow').item.json.member_nino }}",
+        "limit": 1,
+        "filter": {
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "id": "73008d58-103a-4b7d-98d2-b963f6a8b051",
+      "name": "Search Member Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -560,
+        48
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d2e03cb2-9d43-420e-a7a0-e1a87b021720",
+              "leftValue": "={{ $json.id ?? '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "af6f7b4e-64fb-430e-bad1-780cef966f53",
+      "name": "Folder Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -352,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "createFromText",
+        "content": "={{ $('When Executed by Another Workflow').item.json.letter_content }}",
+        "name": "={{ $('When Executed by Another Workflow').item.json.file_name }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "12564886-f286-4ddf-ae66-f2f3a489417b",
+      "name": "Upload Letter (Existing Folder)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -128,
+        -64
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('When Executed by Another Workflow').item.json.member_nino }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "root",
+          "mode": "list",
+          "cachedResultName": "/ (Root folder)",
+          "cachedResultUrl": "https://drive.google.com/drive"
+        },
+        "options": {}
+      },
+      "id": "3577aea0-e3ec-49e2-b69a-224a51c8fdcd",
+      "name": "Create Member Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -128,
+        128
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "createFromText",
+        "content": "={{ $('When Executed by Another Workflow').item.json.letter_content }}",
+        "name": "={{ $('When Executed by Another Workflow').item.json.file_name }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "a17af299-f427-4dc8-97ce-9b3f703301d5",
+      "name": "Upload Letter (New Folder)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        96,
+        128
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "9323b794-2605-4680-b6e6-e96dede7815f",
+      "name": "Download Letter (Existing)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        96,
+        -64
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "3b1b6b05-7f7b-42bf-9fc9-46aed26ae7cd",
+      "name": "Download Letter (New)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        320,
+        128
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CVcyDvh98tDCHqAt",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('When Executed by Another Workflow').item.json.recipient_email }}",
+        "subject": "={{ $('When Executed by Another Workflow').item.json.email_subject }}",
+        "emailType": "text",
+        "message": "={{ $('When Executed by Another Workflow').item.json.email_body }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "id": "d7242d4e-ce31-49c8-a9b4-4f72eef2a874",
+      "name": "Send Gmail (Existing Path)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        -64
+      ],
+      "webhookId": "10d9c1ac-b5ba-4202-9412-c6f62c079821",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a05A9Hadr3xDgrNU",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('When Executed by Another Workflow').item.json.recipient_email }}",
+        "subject": "={{ $('When Executed by Another Workflow').item.json.email_subject }}",
+        "emailType": "text",
+        "message": "={{ $('When Executed by Another Workflow').item.json.email_body }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "id": "df4a26b1-154a-4d99-9cf4-7b2be4b1b750",
+      "name": "Send Gmail (New Path)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        544,
+        128
+      ],
+      "webhookId": "b5ec57f4-ac54-4a75-8b48-dd63519a0d2b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a05A9Hadr3xDgrNU",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -912,
+        48
+      ],
+      "id": "2191f85a-8a3e-4aa4-b3e1-3630c5c4eaba",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://127.0.0.1:5005/best/cases/{{ $('When Executed by Another Workflow').item.json.case_id }}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\"status\": \"{{ $('When Executed by Another Workflow').item.json.best_status ?? 'CLOSED' }}\"}",
+        "options": {}
+      },
+      "id": "a99d5b83-d3f5-4f71-ab39-39328580fd6b",
+      "name": "🔄 BEST — Set Status CLOSED",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        768,
+        -64
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://127.0.0.1:5005/best/cases/{{ $('When Executed by Another Workflow').item.json.case_id }}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\"status\": \"{{ $('When Executed by Another Workflow').item.json.best_status ?? 'CLOSED' }}\"}",
+        "options": {}
+      },
+      "id": "1fb543eb-d315-45bb-8312-cdf01d9f878e",
+      "name": "🔄 BEST — Set Status CLOSED1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        992,
+        128
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bfbdlkuctycrsmkwnykl.supabase.co/rest/v1/demo_progress",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.session_id ?? '') }},\n  \"step_number\": 5,\n  \"step_name\": \"Letter Sent\",\n  \"step_detail\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.step_detail ?? 'Case processed') }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        544,
+        -64
+      ],
+      "id": "ac68e477-04c8-4d00-b193-a49e9f2eec5f",
+      "name": "Log — Letter Sent",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bfbdlkuctycrsmkwnykl.supabase.co/rest/v1/case_audit_log",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"case_id\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.case_id ?? '') }},\n  \"email_subject\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.email_subject ?? '') }},\n  \"sender_email\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.recipient_email ?? '') }},\n  \"sender_type\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.sender_type ?? '') }},\n  \"enquiry_type\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.query_type ?? '') }},\n  \"member_nino\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.member_nino ?? '') }},\n  \"outcome\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.outcome ?? 'closed') }},\n  \"cap_reference\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.cap_reference ?? '') }},\n  \"processing_time_ms\": {{ $('When Executed by Another Workflow').item.json.processing_time_ms ?? 0 }},\n  \"source\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.trigger_source ?? 'production') }},\n  \"session_id\":\"{{ $('When Executed by Another Workflow').item.json.session_id }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        992,
+        -64
+      ],
+      "id": "142a938a-1c8c-4bc5-8e6d-ffbc6ad02c52",
+      "name": "Log — Case Audit CLOSED",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bfbdlkuctycrsmkwnykl.supabase.co/rest/v1/demo_progress",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session_id\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.session_id ?? '') }},\n  \"step_number\": 4,\n  \"step_name\": \"Letter Sent\",\n  \"step_detail\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.step_detail ?? 'Case processed') }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        768,
+        128
+      ],
+      "id": "58a61e3d-94d1-4e67-96ff-edba00a23ea1",
+      "name": "Log — Letter Sent1",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://bfbdlkuctycrsmkwnykl.supabase.co/rest/v1/case_audit_log",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"case_id\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.case_id ?? '') }},\n  \"email_subject\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.email_subject ?? '') }},\n  \"sender_email\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.recipient_email ?? '') }},\n  \"sender_type\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.sender_type ?? '') }},\n  \"enquiry_type\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.query_type ?? '') }},\n  \"member_nino\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.member_nino ?? '') }},\n  \"outcome\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.outcome ?? 'closed') }},\n  \"cap_reference\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.cap_reference ?? '') }},\n  \"processing_time_ms\": {{ $('When Executed by Another Workflow').item.json.processing_time_ms ?? 0 }},\n  \"source\": {{ JSON.stringify($('When Executed by Another Workflow').item.json.trigger_source ?? 'production') }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1216,
+        128
+      ],
+      "id": "edc00e74-413c-40c8-8b1a-3f29a54554b5",
+      "name": "Log — Case Audit CLOSED1",
+      "retryOnFail": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "demo_progress",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "session_id",
+              "fieldValue": "={{ $json.session_id }}"
+            },
+            {
+              "fieldId": "step_name",
+              "fieldValue": "Draft Prepared"
+            },
+            {
+              "fieldId": "step_number",
+              "fieldValue": "4"
+            },
+            {
+              "fieldId": "step_detail",
+              "fieldValue": "=Letter drafted for {{ $json.recipient_email }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        48
+      ],
+      "id": "185bea7c-2887-4d26-83f2-786368dd24cc",
+      "name": "logging1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "member_nino": "CD000012D",
+          "letter_content": "PensionCo Administration\nDate: 12 April 2026\n\nDear Margaret Holloway ,\n\nRe: Pension Enquiry — Case Reference EGP-TRANSFER-04EDE676\n\nThank you for contacting PensionCo Administration.\n\nWe have been unable to locate your membership record using the details provided. Please ensure your National Insurance number and personal details are correct and resubmit your enquiry.\n\nYours sincerely,\nPensionCo Administration",
+          "file_name": "EGP-TRANSFER-04EDE676_MEMBER_NOT_FOUND_20260412.txt",
+          "recipient_email": "devikaraj5885@gmail.com",
+          "email_subject": "Action Required — Membership Verification — Case EGP-TRANSFER-04EDE676",
+          "email_body": "Dear Margaret Holloway ,\n\nCase Reference: EGP-TRANSFER-04EDE676\n\nWe were unable to locate your membership record. Please see the attached letter for next steps.\n\nYours sincerely,\nPensionCo Administration",
+          "session_id": "58",
+          "trigger_source": "webhook",
+          "sender_type": "IFA",
+          "query_type": "transfer",
+          "cap_reference": "CAP-2026-1A00AF",
+          "case_id": "EGP-TRANSFER-04EDE676",
+          "processing_time_ms": "27010",
+          "step_name": "Member Not Found Letter Sent",
+          "step_detail": "Case pended — member not found in syste",
+          "outcome": "pended_member_not_found",
+          "best_status": "PENDED"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Search Member Folder": {
+      "main": [
+        [
+          {
+            "node": "Folder Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Folder Exists?": {
+      "main": [
+        [
+          {
+            "node": "Upload Letter (Existing Folder)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Member Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Letter (Existing Folder)": {
+      "main": [
+        [
+          {
+            "node": "Download Letter (Existing)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Member Folder": {
+      "main": [
+        [
+          {
+            "node": "Upload Letter (New Folder)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Letter (New Folder)": {
+      "main": [
+        [
+          {
+            "node": "Download Letter (New)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Letter (Existing)": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail (Existing Path)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Letter (New)": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail (New Path)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "logging1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Gmail (Existing Path)": {
+      "main": [
+        [
+          {
+            "node": "Log — Letter Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Gmail (New Path)": {
+      "main": [
+        [
+          {
+            "node": "Log — Letter Sent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 BEST — Set Status CLOSED": {
+      "main": [
+        [
+          {
+            "node": "Log — Case Audit CLOSED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log — Letter Sent": {
+      "main": [
+        [
+          {
+            "node": "🔄 BEST — Set Status CLOSED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 BEST — Set Status CLOSED1": {
+      "main": [
+        [
+          {
+            "node": "Log — Case Audit CLOSED1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log — Letter Sent1": {
+      "main": [
+        [
+          {
+            "node": "🔄 BEST — Set Status CLOSED1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "logging1": {
+      "main": [
+        [
+          {
+            "node": "Search Member Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "l7NLGch8O4QP9waH",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "cb8db6d2-0e4b-44e6-ac7a-5f49c0287f10",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a0c499356921f3eb423f7ddf94f46378dfe81ea2a3c94b1e604ef314c524d665"
+  },
+  "id": "ekYdrDZyzDXPjTMP",
+  "tags": []
+}

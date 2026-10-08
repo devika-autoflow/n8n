@@ -1,0 +1,58 @@
+{
+  "name": "Training 6 — Sub 3: Update Status in Supabase",
+  "nodes": [
+    {
+      "parameters": { "inputSource": "passthrough" },
+      "id": "a6040004-0000-4000-8000-000000000001",
+      "name": "Start — From Main",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "training_submissions",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            { "keyName": "id", "condition": "eq", "keyValue": "={{ $json.id }}" }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status", "fieldValue": "completed" }
+          ]
+        }
+      },
+      "id": "a6040004-0000-4000-8000-000000000002",
+      "name": "Supabase — Update Status",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [240, 0],
+      "credentials": {
+        "supabaseApi": { "id": "3f20iADgFIOztuT4", "name": "Supabase account" }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 🗄️ Sub 3 — Update Status in Supabase\n\nCalled by the main workflow, last.\n\nFinds the **same row** the main workflow saved (by `id`) and changes its `status` from `new` to `completed`. No new row is created.\n\nThe updated row goes back to the main workflow.",
+        "height": 380,
+        "width": 500,
+        "color": 5
+      },
+      "id": "a6040004-0000-4000-8000-000000000003",
+      "name": "Note — Sub 3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-80, -260]
+    }
+  ],
+  "connections": {
+    "Start — From Main": { "main": [[{ "node": "Supabase — Update Status", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "callerPolicy": "workflowsFromSameOwner" },
+  "tags": []
+}
