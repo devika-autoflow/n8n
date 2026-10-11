@@ -1,0 +1,288 @@
+{
+  "name": "Assignment 3 — Library Book Check",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assignment-3-library",
+        "options": {}
+      },
+      "id": "5e0ff547-4045-403f-9e1d-9758bcd1eaec",
+      "name": "Webhook — Book Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "c54b99be-80b6-4885-aa50-2b19e4674174",
+      "notes": "Starts the flow. Receives book_name and student_email. Replies at once.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "library_books",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "=book_name=ilike.{{ encodeURIComponent(($json.body.book_name || '').trim()) }}"
+      },
+      "id": "68426dff-1523-4c0e-94af-6d64be929a1e",
+      "name": "Supabase — Find Book",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      },
+      "alwaysOutputData": true,
+      "notes": "Looks the book up in library_books (ignores capitals). Always Output Data is ON so 'not found' still continues.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d86dd259-0365-42eb-9fa2-9f8182b26316",
+              "leftValue": "={{ $json.id ?? '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c738e12d-2e39-4d3d-b32e-bfe19777a89a",
+      "name": "IF — Book Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "notes": "True = the book exists. False = not in the library.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cf757cb8-563e-4013-8022-7455737665fb",
+              "leftValue": "={{ $json.available }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "e36dd88b-8ff6-488f-bfa9-1658d8b51e43",
+      "name": "IF — Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        -120
+      ],
+      "notes": "True = available to collect. False = currently borrowed.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook — Book Request').item.json.body.student_email }}",
+        "subject": "=Your book is available: {{ $json.book_name }}",
+        "emailType": "text",
+        "message": "=Hello,\n\nYour book is available, come and collect it.\n\nBook: {{ $json.book_name }}\nAuthor: {{ $json.author }}\n\nLibrary Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "fa53e5b1-f4b1-423b-b3b7-e8e884c4d6ff",
+      "name": "Gmail — Book Available",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        980,
+        -220
+      ],
+      "webhookId": "531bb108-cea5-4e2f-831e-fee2ab3b6780",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a05A9Hadr3xDgrNU",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Emails: 'Your book is available, come and collect it.'",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook — Book Request').item.json.body.student_email }}",
+        "subject": "=Book currently borrowed: {{ $json.book_name }}",
+        "emailType": "text",
+        "message": "=Hello,\n\nThis book is currently borrowed. Please check again later.\n\nBook: {{ $json.book_name }}\n\nLibrary Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "f90c8f49-9c73-4ba2-a58e-35957dd3df58",
+      "name": "Gmail — Book Borrowed",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        980,
+        -40
+      ],
+      "webhookId": "9c68c9f8-ff28-4054-8851-777e39452f24",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a05A9Hadr3xDgrNU",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Emails: 'This book is currently borrowed.' (extra challenge)",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook — Book Request').item.json.body.student_email }}",
+        "subject": "Sorry, we don't have this book",
+        "emailType": "text",
+        "message": "=Hello,\n\nSorry, we don't have this book: {{ $('Webhook — Book Request').item.json.body.book_name }}\n\nLibrary Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "26e81db7-381f-4552-9957-c94fc7a1821c",
+      "name": "Gmail — Book Not Found",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        720,
+        160
+      ],
+      "webhookId": "beb92209-9b68-458e-9f1d-d756c7f19427",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a05A9Hadr3xDgrNU",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Emails: 'Sorry, we don't have this book.'",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "## Assignment 3 — Library Book Check\n\n**Flow:** webhook → find book in `library_books` (Always Output Data ON) → IF found → IF available → one of 3 emails\n\n---\n\n### 🧪 Available\n\n```json\n{ \"book_name\": \"Atomic Habits\", \"student_email\": \"your-email@example.com\" }\n```\n\n### 🧪 Borrowed (extra challenge)\n\n```json\n{ \"book_name\": \"Wings of Fire\", \"student_email\": \"your-email@example.com\" }\n```\n\n### 🧪 Not found\n\n```json\n{ \"book_name\": \"Harry Potter\", \"student_email\": \"your-email@example.com\" }\n```\n",
+        "width": 600,
+        "height": 560,
+        "color": 4
+      },
+      "id": "baab1295-a617-4f4d-8b67-aec346fae59a",
+      "name": "Note — Assignment 3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -760
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — Book Request": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Find Book",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase — Find Book": {
+      "main": [
+        [
+          {
+            "node": "IF — Book Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Book Found?": {
+      "main": [
+        [
+          {
+            "node": "IF — Available?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail — Book Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Available?": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Book Available",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail — Book Borrowed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

@@ -1,0 +1,209 @@
+{
+  "name": "Assignment 5 — Course Enrolment (Main)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assignment-5-enrol",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "id": "8430a9e1-3082-4a04-969c-0bdadcea6aa5",
+      "name": "Webhook — Enrolment",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "704442bb-bb68-45a8-8759-0c90c7259b89",
+      "notes": "Starts the flow. Receives name, email, course.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4608b695-aac1-4903-8284-69db25f81508",
+              "name": "name",
+              "value": "={{ ($json.body.name || 'Student').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "81368f35-e34c-4d46-8748-69fd7efcf9a6",
+              "name": "email",
+              "value": "={{ ($json.body.email || '').toLowerCase().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "14f0d20d-da4b-4157-9737-96f1aa5fb2f4",
+              "name": "course",
+              "value": "={{ ($json.body.course || 'General').trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5e2bd82c-668b-4fc1-806b-0225b1f110c3",
+      "name": "Edit — Clean Enrolment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "notes": "Trims spaces, lowercases the email, fills defaults.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "tableId": "students",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $json.name }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email }}"
+            },
+            {
+              "fieldId": "course",
+              "fieldValue": "={{ $json.course }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "new"
+            }
+          ]
+        }
+      },
+      "id": "3d9b3bc7-8ff1-4020-b20d-1532acc864eb",
+      "name": "Supabase — Save as New",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "Inserts the student into students with status 'new'. The new id is passed to the sub-workflow.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "0d94d86d-ed95-49eb-83e5-2446b9764c16",
+      "name": "Run Sub — Welcome & Enrol",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        0
+      ],
+      "notes": "CALLS SUB-WORKFLOW: 'Assignment 5 — Sub: Welcome Email & Enrol'. Waits for it, then gets the updated row back.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"message\": \"Enrolled successfully\", \"student_id\": $json.id, \"status\": $json.status } }}",
+        "options": {}
+      },
+      "id": "fd587b7b-3766-485b-bbb2-1c8dca460002",
+      "name": "Respond — Enrolled",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ],
+      "notes": "Replies: 'Enrolled successfully' + id + status.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "## Assignment 5 — Course Enrolment (Main)\n\n**Flow:** webhook → clean → save in `students` as `new` → **sub-workflow** (welcome email + set `enrolled`) → reply\n\n**Setup:** import the Sub first, then pick it in `Run Sub — Welcome & Enrol`.\n\n---\n\n### 🧪 Python Basics\n\n```json\n{ \"name\": \"Divya Nair\", \"email\": \"your-email@example.com\", \"course\": \"Python Basics\" }\n```\n\n### 🧪 Digital Marketing\n\n```json\n{ \"name\": \"Kiran Das\", \"email\": \"your-email@example.com\", \"course\": \"Digital Marketing\" }\n```\n",
+        "width": 620,
+        "height": 580,
+        "color": 4
+      },
+      "id": "5e89ac84-dfe2-4b04-8195-f59373fb919d",
+      "name": "Note — Assignment 5 Main",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -640
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — Enrolment": {
+      "main": [
+        [
+          {
+            "node": "Edit — Clean Enrolment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — Clean Enrolment": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Save as New",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase — Save as New": {
+      "main": [
+        [
+          {
+            "node": "Run Sub — Welcome & Enrol",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Sub — Welcome & Enrol": {
+      "main": [
+        [
+          {
+            "node": "Respond — Enrolled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

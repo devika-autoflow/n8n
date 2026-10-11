@@ -12,17 +12,42 @@
       "name": "Webhook — Member Enquiry",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [0, 0],
-      "webhookId": "a6000000-0000-4000-8000-000000000001"
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "a6000000-0000-4000-8000-000000000001",
+      "notes": "Starts the flow. Receives full_name, email, query_type, message.",
+      "notesInFlow": true
     },
     {
       "parameters": {
         "assignments": {
           "assignments": [
-            { "id": "m1", "name": "full_name", "value": "={{ ($json.body.full_name || 'Member').trim() }}", "type": "string" },
-            { "id": "m2", "name": "email", "value": "={{ ($json.body.email || '').toLowerCase().trim() }}", "type": "string" },
-            { "id": "m3", "name": "query_type", "value": "={{ ($json.body.query_type || 'general').toLowerCase().trim() }}", "type": "string" },
-            { "id": "m4", "name": "message", "value": "={{ $json.body.message || '' }}", "type": "string" }
+            {
+              "id": "m1",
+              "name": "full_name",
+              "value": "={{ ($json.body.full_name || 'Member').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "m2",
+              "name": "email",
+              "value": "={{ ($json.body.email || '').toLowerCase().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "m3",
+              "name": "query_type",
+              "value": "={{ ($json.body.query_type || 'general').toLowerCase().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "m4",
+              "name": "message",
+              "value": "={{ $json.body.message || '' }}",
+              "type": "string"
+            }
           ]
         },
         "options": {}
@@ -31,18 +56,38 @@
       "name": "Edit — Prepare Enquiry",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ],
+      "notes": "Trims and lowercases the fields, fills defaults.",
+      "notesInFlow": true
     },
     {
       "parameters": {
         "tableId": "training_submissions",
         "fieldsUi": {
           "fieldValues": [
-            { "fieldId": "full_name", "fieldValue": "={{ $json.full_name }}" },
-            { "fieldId": "email", "fieldValue": "={{ $json.email }}" },
-            { "fieldId": "category", "fieldValue": "={{ $json.query_type }}" },
-            { "fieldId": "message", "fieldValue": "={{ $json.message }}" },
-            { "fieldId": "status", "fieldValue": "new" }
+            {
+              "fieldId": "full_name",
+              "fieldValue": "={{ $json.full_name }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $json.query_type }}"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "={{ $json.message }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "new"
+            }
           ]
         }
       },
@@ -50,49 +95,87 @@
       "name": "Supabase — Save Enquiry",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "credentials": {
-        "supabaseApi": { "id": "3f20iADgFIOztuT4", "name": "Supabase account" }
-      }
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "Inserts the enquiry into training_submissions with status 'new'. The id becomes PEN-<id>.",
+      "notesInFlow": true
     },
     {
       "parameters": {
-        "workflowId": { "__rl": true, "value": "", "mode": "list" },
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
         "mode": "each",
-        "options": { "waitForSubWorkflow": true }
+        "options": {
+          "waitForSubWorkflow": true
+        }
       },
       "id": "a6000000-0000-4000-8000-000000000003",
       "name": "Sub 1 — Email Member",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.1,
-      "position": [680, 0],
-      "notes": "Select 'Training 6 — Sub 1: Email Member'"
+      "position": [
+        680,
+        0
+      ],
+      "notes": "CALLS SUB-WORKFLOW: 'Training 6 — Sub 1: Email Member'. Sends the member their acknowledgement.",
+      "notesInFlow": true
     },
     {
       "parameters": {
-        "workflowId": { "__rl": true, "value": "", "mode": "list" },
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
         "mode": "each",
-        "options": { "waitForSubWorkflow": true }
+        "options": {
+          "waitForSubWorkflow": true
+        }
       },
       "id": "a6000000-0000-4000-8000-000000000004",
       "name": "Sub 2 — Notify Admin",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.1,
-      "position": [920, 0],
-      "notes": "Select 'Training 6 — Sub 2: Notify Admin'"
+      "position": [
+        920,
+        0
+      ],
+      "notes": "CALLS SUB-WORKFLOW: 'Training 6 — Sub 2: Notify Admin'. Sends the admin alert.",
+      "notesInFlow": true
     },
     {
       "parameters": {
-        "workflowId": { "__rl": true, "value": "", "mode": "list" },
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
         "mode": "each",
-        "options": { "waitForSubWorkflow": true }
+        "options": {
+          "waitForSubWorkflow": true
+        }
       },
       "id": "a6000000-0000-4000-8000-000000000005",
       "name": "Sub 3 — Update Status",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.1,
-      "position": [1160, 0],
-      "notes": "Select 'Training 6 — Sub 3: Update Status in Supabase'"
+      "position": [
+        1160,
+        0
+      ],
+      "notes": "CALLS SUB-WORKFLOW: 'Training 6 — Sub 3: Update Status in Supabase'. Sets the same row to 'completed'.",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -104,7 +187,12 @@
       "name": "Respond — Done",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1400, 0]
+      "position": [
+        1400,
+        0
+      ],
+      "notes": "Replies with the reference, member, email and final status.",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -117,7 +205,10 @@
       "name": "Note — Overview & Test",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-640, -320]
+      "position": [
+        -640,
+        -320
+      ]
     },
     {
       "parameters": {
@@ -130,7 +221,10 @@
       "name": "Note — Receive & Save",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-60, -200]
+      "position": [
+        -60,
+        -200
+      ]
     },
     {
       "parameters": {
@@ -143,18 +237,83 @@
       "name": "Note — Sub-workflows",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [620, -200]
+      "position": [
+        620,
+        -200
+      ]
     }
   ],
   "connections": {
-    "Webhook — Member Enquiry": { "main": [[{ "node": "Edit — Prepare Enquiry", "type": "main", "index": 0 }]] },
-    "Edit — Prepare Enquiry": { "main": [[{ "node": "Supabase — Save Enquiry", "type": "main", "index": 0 }]] },
-    "Supabase — Save Enquiry": { "main": [[{ "node": "Sub 1 — Email Member", "type": "main", "index": 0 }]] },
-    "Sub 1 — Email Member": { "main": [[{ "node": "Sub 2 — Notify Admin", "type": "main", "index": 0 }]] },
-    "Sub 2 — Notify Admin": { "main": [[{ "node": "Sub 3 — Update Status", "type": "main", "index": 0 }]] },
-    "Sub 3 — Update Status": { "main": [[{ "node": "Respond — Done", "type": "main", "index": 0 }]] }
+    "Webhook — Member Enquiry": {
+      "main": [
+        [
+          {
+            "node": "Edit — Prepare Enquiry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — Prepare Enquiry": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Save Enquiry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase — Save Enquiry": {
+      "main": [
+        [
+          {
+            "node": "Sub 1 — Email Member",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sub 1 — Email Member": {
+      "main": [
+        [
+          {
+            "node": "Sub 2 — Notify Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sub 2 — Notify Admin": {
+      "main": [
+        [
+          {
+            "node": "Sub 3 — Update Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sub 3 — Update Status": {
+      "main": [
+        [
+          {
+            "node": "Respond — Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "active": false,
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "tags": []
 }

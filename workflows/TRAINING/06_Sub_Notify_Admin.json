@@ -2,12 +2,19 @@
   "name": "Training 6 — Sub 2: Notify Admin",
   "nodes": [
     {
-      "parameters": { "inputSource": "passthrough" },
+      "parameters": {
+        "inputSource": "passthrough"
+      },
       "id": "a6030003-0000-4000-8000-000000000001",
       "name": "Start — From Main",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Starts ONLY when called by: Training 6 — Pension Enquiry (Main), node 'Sub 2 — Notify Admin'.",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -15,17 +22,27 @@
         "subject": "=New pension enquiry PEN-{{ $json.id }} — {{ $json.category }}",
         "emailType": "text",
         "message": "=New enquiry received.\n\nReference: PEN-{{ $json.id }}\nMember: {{ $json.full_name }}\nEmail: {{ $json.email }}\nType: {{ $json.category }}\n\nMessage:\n{{ $json.message }}\n\nThe member has been sent an acknowledgement.",
-        "options": { "appendAttribution": false }
+        "options": {
+          "appendAttribution": false
+        }
       },
       "id": "a6030003-0000-4000-8000-000000000002",
       "name": "Gmail — Alert Admin",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [240, 0],
+      "position": [
+        240,
+        0
+      ],
       "webhookId": "a6030003-0000-4000-8000-000000000002",
       "credentials": {
-        "gmailOAuth2": { "id": "a05A9Hadr3xDgrNU", "name": "Gmail account" }
-      }
+        "gmailOAuth2": {
+          "id": "a05A9Hadr3xDgrNU",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Emails the admin inbox with the case details.",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -35,7 +52,12 @@
       "name": "Code — Return Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [480, 0]
+      "position": [
+        480,
+        0
+      ],
+      "notes": "Returns the original data to the main workflow (Gmail's output would replace it).",
+      "notesInFlow": true
     },
     {
       "parameters": {
@@ -48,14 +70,40 @@
       "name": "Note — Sub 2",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-80, -260]
+      "position": [
+        -80,
+        -260
+      ]
     }
   ],
   "connections": {
-    "Start — From Main": { "main": [[{ "node": "Gmail — Alert Admin", "type": "main", "index": 0 }]] },
-    "Gmail — Alert Admin": { "main": [[{ "node": "Code — Return Data", "type": "main", "index": 0 }]] }
+    "Start — From Main": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Alert Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail — Alert Admin": {
+      "main": [
+        [
+          {
+            "node": "Code — Return Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "active": false,
-  "settings": { "executionOrder": "v1", "callerPolicy": "workflowsFromSameOwner" },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
   "tags": []
 }

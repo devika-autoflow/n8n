@@ -1,0 +1,134 @@
+{
+  "name": "Assignment 4 — Currency Converter",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assignment-4-currency",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "id": "685cc6b8-a4b9-4411-a45e-0581a2f00828",
+      "name": "Webhook — Convert Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "90695148-a9e1-4dac-857e-56899f993918",
+      "notes": "Starts the flow. Receives amount, from, to.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "url": "=https://open.er-api.com/v6/latest/{{ ($json.body.from || 'GBP').toUpperCase().trim() }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "209d3644-f297-4fdb-a716-a8815c4a9174",
+      "name": "HTTP — Get Exchange Rates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "notes": "API call: GET open.er-api.com/v6/latest/<from>. Free, no key. Never Error is ON.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate the converted amount from the exchange-rate reply\nconst req = $('Webhook — Convert Request').first().json.body;\nconst api = $input.first().json;\nconst amount = Number(req.amount);\nconst from = String(req.from || '').toUpperCase();\nconst to = String(req.to || '').toUpperCase();\n\nif (api.result !== 'success') {\n  return [{ json: { ok: false, error: `Unknown currency: ${from}` } }];\n}\nif (!amount || amount <= 0) {\n  return [{ json: { ok: false, error: 'Amount must be a number above 0' } }];\n}\nconst rate = api.rates[to];\nif (!rate) {\n  return [{ json: { ok: false, error: `Unknown currency: ${to}` } }];\n}\nconst converted = Math.round(amount * rate * 100) / 100;\nreturn [{ json: { ok: true, result: `${amount} ${from} = ${converted} ${to}`, rate, rate_date: api.time_last_update_utc } }];"
+      },
+      "id": "7fbc6ff6-a0e8-4779-90b5-099448890f2e",
+      "name": "Code — Calculate Conversion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "notes": "Checks the input, multiplies by the rate, builds '100 GBP = 132.31 USD' or a clear error.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "98c962c9-ea7a-40fa-a513-2b3052d12554",
+      "name": "Respond — Converted Amount",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        720,
+        0
+      ],
+      "notes": "Replies with the result (or the error message).",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "## Assignment 4 — Currency Converter\n\n**Flow:** webhook → GET open.er-api.com (free, no key; Never Error ON) → Code calculates → reply\n\n---\n\n### 🧪 GBP → USD\n\n```json\n{ \"amount\": 100, \"from\": \"GBP\", \"to\": \"USD\" }\n```\n\n### 🧪 INR → EUR\n\n```json\n{ \"amount\": 2500, \"from\": \"INR\", \"to\": \"EUR\" }\n```\n\n### 🧪 Wrong currency (clear error, no crash)\n\n```json\n{ \"amount\": 50, \"from\": \"GBP\", \"to\": \"XYZ\" }\n```\n",
+        "width": 560,
+        "height": 600,
+        "color": 4
+      },
+      "id": "9317ac14-55bf-4a0d-a911-fcf23a66ec44",
+      "name": "Note — Assignment 4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -660
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — Convert Request": {
+      "main": [
+        [
+          {
+            "node": "HTTP — Get Exchange Rates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP — Get Exchange Rates": {
+      "main": [
+        [
+          {
+            "node": "Code — Calculate Conversion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Calculate Conversion": {
+      "main": [
+        [
+          {
+            "node": "Respond — Converted Amount",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

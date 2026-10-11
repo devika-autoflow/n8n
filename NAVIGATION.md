@@ -22,6 +22,7 @@ First-pass map (2026-10-02) — grow this as files are added.
 - `workflows/PENSION/` — client PensionCo automation (main + chaser + drive/email sub).
 - `workflows/TRAINING/` — 5 simple generic training workflows (intro to webhook/set/switch/if/http/code/gmail/supabase) + `00_supabase_setup.sql`. Not pension-related; use client pension.co Supabase as DB host only. Workflow 5 calls postcodes.io.
 - `workflows/TRAINING/06_*` — Training 6: "Pension Enquiry" main workflow (saves row first) calling 3 sub-workflows (Sub 1 email member, Sub 2 notify admin, Sub 3 update same row status). Import the 3 Subs first.
+- `workflows/TRAINING/ASSIGNMENT_ANSWERS/` — answer workflows for the 5 trainee assignments (A1–A5; A5 = main + sub) + `00_assignments_setup.sql` (students, library_books tables).
 
 ## Docs
 

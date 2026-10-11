@@ -1,0 +1,171 @@
+{
+  "name": "Assignment 1 — Student Registration Form",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assignment-1-register",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "id": "204c8b49-c464-4f07-ade3-749066fea743",
+      "name": "Webhook — Student Registration",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "1ffcd3c4-b0d2-40c9-856c-925c960c42dd",
+      "notes": "Starts the flow. Receives name, email, course (POST /assignment-1-register).",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "62244763-aa4f-43b7-a7fd-54c2dae98d74",
+              "name": "name",
+              "value": "={{ ($json.body.name || 'Unknown').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "310525c8-9e71-4e5c-adb3-f021c890ccc1",
+              "name": "email",
+              "value": "={{ ($json.body.email || '').toLowerCase().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "07a5e946-1580-4bb1-bfd7-95cb0cc38a22",
+              "name": "course",
+              "value": "={{ ($json.body.course || 'Not given').trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ed674852-132b-463f-8e80-e77872c1230e",
+      "name": "Edit — Clean Student Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "notes": "Trims spaces, lowercases the email, fills defaults for missing values.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "tableId": "students",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $json.name }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email }}"
+            },
+            {
+              "fieldId": "course",
+              "fieldValue": "={{ $json.course }}"
+            }
+          ]
+        }
+      },
+      "id": "8fe6df2d-4a18-4b11-86f7-9b494f310329",
+      "name": "Supabase — Save Student",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "Inserts one row into the students table. Returns the new id.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"message\": \"Registration saved\", \"student_id\": $json.id, \"email\": $json.email } }}",
+        "options": {}
+      },
+      "id": "cac27f52-f020-4777-98cb-b912d22f1260",
+      "name": "Respond — Registration Saved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ],
+      "notes": "Replies to the caller: 'Registration saved' + student id.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "## Assignment 1 — Student Registration Form\n\n**Flow:** webhook → clean email (trim + lowercase) → save in `students` → reply\n\n---\n\n### 🧪 Test 1 — messy email\n\n```json\n{ \"name\": \"Anita Rao\", \"email\": \"  ANITA.RAO@Example.com \", \"course\": \"Data Analytics\" }\n```\n\n### 🧪 Test 2 — missing email (must not crash)\n\n```json\n{ \"name\": \"Rahul Menon\", \"course\": \"Web Design\" }\n```\n",
+        "width": 560,
+        "height": 500,
+        "color": 4
+      },
+      "id": "7d4627e2-43b5-4608-8e88-0ea248e3b09d",
+      "name": "Note — Assignment 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -560
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — Student Registration": {
+      "main": [
+        [
+          {
+            "node": "Edit — Clean Student Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — Clean Student Data": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Save Student",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase — Save Student": {
+      "main": [
+        [
+          {
+            "node": "Respond — Registration Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

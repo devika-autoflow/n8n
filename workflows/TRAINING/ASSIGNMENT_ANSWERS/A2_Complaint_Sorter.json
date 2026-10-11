@@ -1,0 +1,390 @@
+{
+  "name": "Assignment 2 — Complaint Sorter",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assignment-2-complaint",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "id": "c03b6278-f748-4ee4-9af7-b5e80c001048",
+      "name": "Webhook — New Complaint",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "30ac8277-21e9-4328-913e-3d0a623e8211",
+      "notes": "Starts the flow. Receives complaint_type, customer, details.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "9cd105dd-4c30-46a4-b3d6-dafa4ceee3a7",
+                    "leftValue": "={{ $json.body.complaint_type }}",
+                    "rightValue": "delivery",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Delivery"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d29e83a5-af60-4344-9bcc-16633803c7fc",
+                    "leftValue": "={{ $json.body.complaint_type }}",
+                    "rightValue": "payment",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Payment"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "92c26658-305b-48ed-80ef-057a0903a789",
+                    "leftValue": "={{ $json.body.complaint_type }}",
+                    "rightValue": "product",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Product"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Other"
+        }
+      },
+      "id": "31e81e9e-8c7e-4be6-afcb-33435c3fe3c3",
+      "name": "Router — Complaint Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        240,
+        0
+      ],
+      "notes": "Switch: delivery / payment / product. Anything else goes to the fallback (Other).",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "df3460f5-af57-47a4-97b9-4cd5fdda0afd",
+              "name": "team",
+              "value": "Delivery Team",
+              "type": "string"
+            },
+            {
+              "id": "bf1b9353-ad8a-40ce-ba17-ba0c5403dee5",
+              "name": "customer",
+              "value": "={{ $json.body.customer }}",
+              "type": "string"
+            },
+            {
+              "id": "2ddab5a4-8230-46be-9336-ee21c4bfa5fe",
+              "name": "details",
+              "value": "={{ $json.body.details }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "766bf453-655d-4ecb-a47b-615debd2f285",
+      "name": "Edit — Delivery Team",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -240
+      ],
+      "notes": "Branch 1: assigns the complaint to Delivery Team.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "afb5651c-2178-4b3d-af33-a4f892bf7c43",
+              "name": "team",
+              "value": "Accounts Team",
+              "type": "string"
+            },
+            {
+              "id": "50e2f0be-33fc-4527-87eb-c0553df76a5e",
+              "name": "customer",
+              "value": "={{ $json.body.customer }}",
+              "type": "string"
+            },
+            {
+              "id": "58d64db7-ebd4-43c3-91d5-9e35e12267e8",
+              "name": "details",
+              "value": "={{ $json.body.details }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6e24f0a3-4945-4cb4-ad0e-806d7548afec",
+      "name": "Edit — Accounts Team",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -80
+      ],
+      "notes": "Branch 2: payment complaints go to Accounts Team.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9093b632-ff31-4c83-af2d-862a92a0bd51",
+              "name": "team",
+              "value": "Product Team",
+              "type": "string"
+            },
+            {
+              "id": "eb12fa53-f926-4e37-872d-81e120cedc44",
+              "name": "customer",
+              "value": "={{ $json.body.customer }}",
+              "type": "string"
+            },
+            {
+              "id": "73412610-a2cc-43d1-9a39-4f129af5719d",
+              "name": "details",
+              "value": "={{ $json.body.details }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "20daf46b-546b-4dc7-ad59-1c4a76ee946a",
+      "name": "Edit — Product Team",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        80
+      ],
+      "notes": "Branch 3: assigns the complaint to Product Team.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fa2d831e-97ff-4830-8afc-623aa9a9be6a",
+              "name": "team",
+              "value": "General Team",
+              "type": "string"
+            },
+            {
+              "id": "1b056adf-0969-4fcd-bf40-5731409df9fc",
+              "name": "customer",
+              "value": "={{ $json.body.customer }}",
+              "type": "string"
+            },
+            {
+              "id": "388ded01-6591-4dfe-a27e-09da4c7521b7",
+              "name": "details",
+              "value": "={{ $json.body.details }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2e04f88d-600b-4ae2-ae47-435516eecf80",
+      "name": "Edit — General Team",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        240
+      ],
+      "notes": "Fallback branch: any other type goes to General Team.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"assigned_to\": $json.team, \"customer\": $json.customer } }}",
+        "options": {}
+      },
+      "id": "0fb18102-323b-4f84-9421-60410af9c3c2",
+      "name": "Respond — Team Assigned",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        760,
+        0
+      ],
+      "notes": "All branches meet here. Replies with the team name.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "## Assignment 2 — Complaint Sorter\n\n**Flow:** webhook → Switch on `complaint_type` → set team (fallback = General Team) → reply\n\n---\n\n### 🧪 Delivery\n\n```json\n{ \"complaint_type\": \"delivery\", \"customer\": \"Meera\", \"details\": \"Parcel arrived late\" }\n```\n\n### 🧪 Payment\n\n```json\n{ \"complaint_type\": \"payment\", \"customer\": \"John\", \"details\": \"Charged twice\" }\n```\n\n### 🧪 Product\n\n```json\n{ \"complaint_type\": \"product\", \"customer\": \"Sara\", \"details\": \"Item was damaged\" }\n```\n\n### 🧪 Fallback\n\n```json\n{ \"complaint_type\": \"website\", \"customer\": \"Ali\", \"details\": \"Page will not load\" }\n```\n",
+        "width": 560,
+        "height": 620,
+        "color": 4
+      },
+      "id": "c014bd57-3276-456a-98af-0a334af57bd1",
+      "name": "Note — Assignment 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -900
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook — New Complaint": {
+      "main": [
+        [
+          {
+            "node": "Router — Complaint Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router — Complaint Type": {
+      "main": [
+        [
+          {
+            "node": "Edit — Delivery Team",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit — Accounts Team",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit — Product Team",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit — General Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — Delivery Team": {
+      "main": [
+        [
+          {
+            "node": "Respond — Team Assigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — Accounts Team": {
+      "main": [
+        [
+          {
+            "node": "Respond — Team Assigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — Product Team": {
+      "main": [
+        [
+          {
+            "node": "Respond — Team Assigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit — General Team": {
+      "main": [
+        [
+          {
+            "node": "Respond — Team Assigned",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

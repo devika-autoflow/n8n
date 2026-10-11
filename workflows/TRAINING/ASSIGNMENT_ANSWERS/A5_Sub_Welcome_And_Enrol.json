@@ -1,0 +1,135 @@
+{
+  "name": "Assignment 5 — Sub: Welcome Email & Enrol",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "3678e665-2395-4582-b8ac-5f20a6e3517f",
+      "name": "Start — From Main",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Starts ONLY when called by: Assignment 5 — Course Enrolment (Main), node 'Run Sub — Welcome & Enrol'.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Welcome to {{ $json.course }}!",
+        "emailType": "text",
+        "message": "=Hi {{ $json.name }},\n\nWelcome to {{ $json.course }}. Your enrolment number is STU-{{ $json.id }}.\nWe will send your timetable soon.\n\nTraining Institute",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "3ceed9cd-52a5-467c-9d94-489e99f8183d",
+      "name": "Gmail — Welcome Student",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        0
+      ],
+      "webhookId": "b7a3f434-7839-4913-8eb6-56eda8c04a5f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "a05A9Hadr3xDgrNU",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Sends the welcome email for the chosen course.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "students",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Start — From Main').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "enrolled"
+            }
+          ]
+        }
+      },
+      "id": "15bf9d20-bea2-49e9-beb0-0cf27e239213",
+      "name": "Supabase — Mark Enrolled",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        480,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "3f20iADgFIOztuT4",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "Updates the SAME row (by id) from 'new' to 'enrolled'. Its output goes back to the main workflow.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "content": "## Assignment 5 — Sub-workflow\n\nCalled by the main workflow. Sends the welcome email, then updates the **same row** (by `id`) from `new` to `enrolled`. The updated row goes back to the main workflow.",
+        "width": 720,
+        "height": 260,
+        "color": 5
+      },
+      "id": "adc32cdd-5a48-4831-8fd3-39e4cd76e363",
+      "name": "Note — Assignment 5 Sub",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -300
+      ]
+    }
+  ],
+  "connections": {
+    "Start — From Main": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Welcome Student",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail — Welcome Student": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Mark Enrolled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}
